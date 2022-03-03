@@ -21,6 +21,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.opensaml.saml.saml1.core.NameIdentifier;
 import org.wso2.carbon.database.utils.jdbc.exceptions.DataAccessException;
 import org.wso2.carbon.identity.base.IdentityException;
 import org.wso2.carbon.identity.core.CertificateRetriever;
@@ -28,6 +29,7 @@ import org.wso2.carbon.identity.core.CertificateRetrievingException;
 import org.wso2.carbon.identity.core.DatabaseCertificateRetriever;
 import org.wso2.carbon.identity.core.IdentityRegistryResources;
 import org.wso2.carbon.identity.core.KeyStoreCertificateRetriever;
+import org.wso2.carbon.identity.core.model.SAMLSSOAttribute;
 import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
@@ -46,6 +48,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.wso2.carbon.identity.core.util.JdbcUtils.isH2DB;
@@ -62,6 +65,40 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             "SP.ID = META.SP_ID AND META.NAME = ? AND INBOUND.INBOUND_AUTH_KEY = ? AND META.TENANT_ID = ?";
 
     private static Log log = LogFactory.getLog(SAMLSSOServiceProviderDAO.class);
+
+    public static final String ISSUER = "issuer";
+    public static final String ISSUER_QUALIFIER = "issuerQualifier";
+    public static final String ASSERTION_CONSUMER_URLS = "assertionConsumerUrls";
+    public static final String DEFAULT_ASSERTION_CONSUMER_URL = "defaultAssertionConsumerUrl";
+    public static final String SIGNING_ALGORITHM_URI = "signingAlgorithmURI";
+    public static final String DIGEST_ALGORITHM_URI = "digestAlgorithmURI";
+    public static final String ASSERTION_ENCRYPTION_ALGORITHM_URI = "assertionEncryptionAlgorithmURI";
+    public static final String KEY_ENCRYPTION_ALGORITHM_URI = "keyEncryptionAlgorithmURI";
+    public static final String CERT_ALIAS = "certAlias";
+    public static final String ATTRIBUTE_CONSUMING_SERVICE_INDEX = "attributeConsumingServiceIndex";
+    public static final String DO_SIGN_RESPONSE = "doSignResponse";
+    public static final String DO_SINGLE_LOGOUT = "doSingleLogout";
+    public static final String DO_FRONT_CHANNEL_LOGOUT = "doFrontChannelLogout";
+    public static final String FRONT_CHANNEL_LOGOUT_BINDING = "frontChannelLogoutBinding";
+    public static final String IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED = "isAssertionQueryRequestProfileEnabled";
+    public static final String SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES = "supportedAssertionQueryRequestTypes";
+    public static final String ENABLE_SAML2_ARTIFACT_BINDING = "enableSAML2ArtifactBinding";
+    public static final String DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE = "doValidateSignatureInArtifactResolve";
+    public static final String LOGIN_PAGE_URL = "loginPageURL";
+    public static final String SLO_RESPONSE_URL = "sloResponseURL";
+    public static final String SLO_REQUEST_URL = "sloRequestURL";
+    public static final String REQUESTED_CLAIMS = "requestedClaims";
+    public static final String REQUESTED_AUDIENCES = "requestedAudiences";
+    public static final String REQUESTED_RECIPIENTS = "requestedRecipients";
+    public static final String ENABLE_ATTRIBUTES_BY_DEFAULT = "enableAttributesByDefault";
+    public static final String NAME_ID_CLAIM_URI = "nameIdClaimUri";
+    public static final String NAME_ID_FORMAT = "nameIDFormat";
+    public static final String IDP_INIT_SSO_ENABLED = "idPInitSSOEnabled";
+    public static final String IDP_INIT_SLO_ENABLED = "idPInitSLOEnabled";
+    public static final String IDP_INIT_SLO_RETURN_TO_URLS = "idpInitSLOReturnToURLs";
+    public static final String DO_ENABLE_ENCRYPTED_ASSERTION = "doEnableEncryptedAssertion";
+    public static final String DO_VALIDATE_SIGNATURE_IN_REQUESTS = "doValidateSignatureInRequests";
+    public static final String IDP_ENTITY_ID_ALIAS = "idpEntityIDAlias";
 
     public SAMLSSOServiceProviderDAO(Registry registry) {
         this.registry = registry;
@@ -315,6 +352,22 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         } finally {
             commitOrRollbackTransaction(isErrorOccurred);
         }
+    }
+
+    public boolean addServiceProvider_new(SAMLSSOServiceProviderDO serviceProviderDO) throws IdentityException {
+
+        if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null ||
+                StringUtils.isBlank(serviceProviderDO.getIssuer())) {
+            throw new IdentityException("Issuer cannot be found in the provided arguments.");
+        }
+
+        // If an issuer qualifier value is specified, it is appended to the end of the issuer value.
+        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
+            serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
+                    serviceProviderDO.getIssuerQualifier()));
+        }
+
+        return true;
     }
 
     private Resource createResource(SAMLSSOServiceProviderDO serviceProviderDO) throws RegistryException {
@@ -769,4 +822,186 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             }
         }
     }
+
+    public List<SAMLSSOAttribute> convertServiceProviderToList(SAMLSSOServiceProviderDO serviceProviderDO) {
+        UserRegistry userRegistry = (UserRegistry) registry;
+        int tenantId = userRegistry.getTenantId();
+        List<SAMLSSOAttribute> list = new ArrayList<>();
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ISSUER,serviceProviderDO.getIssuer(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ISSUER_QUALIFIER,serviceProviderDO.getIssuerQualifier(),tenantId));
+        for(String url : serviceProviderDO.getAssertionConsumerUrls()){
+            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ASSERTION_CONSUMER_URLS,url,tenantId));
+        }
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DEFAULT_ASSERTION_CONSUMER_URL,serviceProviderDO.getDefaultAssertionConsumerUrl(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SIGNING_ALGORITHM_URI,serviceProviderDO.getSigningAlgorithmUri(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DIGEST_ALGORITHM_URI,serviceProviderDO.getDigestAlgorithmUri(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ASSERTION_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getAssertionEncryptionAlgorithmUri(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),KEY_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getKeyEncryptionAlgorithmUri(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),CERT_ALIAS,serviceProviderDO.getCertAlias(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ATTRIBUTE_CONSUMING_SERVICE_INDEX,serviceProviderDO.getAttributeConsumingServiceIndex(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_SIGN_RESPONSE,serviceProviderDO.isDoSignResponse() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_SINGLE_LOGOUT,serviceProviderDO.isDoSingleLogout() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_FRONT_CHANNEL_LOGOUT,serviceProviderDO.isDoFrontChannelLogout() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),FRONT_CHANNEL_LOGOUT_BINDING,serviceProviderDO.getFrontChannelLogoutBinding(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED,serviceProviderDO.isAssertionQueryRequestProfileEnabled() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES,serviceProviderDO.getSupportedAssertionQueryRequestTypes(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ENABLE_SAML2_ARTIFACT_BINDING,serviceProviderDO.isEnableSAML2ArtifactBinding() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE,serviceProviderDO.isDoValidateSignatureInArtifactResolve() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),LOGIN_PAGE_URL,serviceProviderDO.getLoginPageURL(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SLO_RESPONSE_URL,serviceProviderDO.getSloResponseURL(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SLO_REQUEST_URL,serviceProviderDO.getSloRequestURL(),tenantId));
+        for(String claim : serviceProviderDO.getRequestedClaims()){
+            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_CLAIMS,claim,tenantId));
+        }
+        for(String audience : serviceProviderDO.getRequestedAudiences()){
+            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_AUDIENCES,audience,tenantId));
+        }
+        for(String recipient : serviceProviderDO.getRequestedRecipients()){
+            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_RECIPIENTS,recipient,tenantId));
+        }
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ENABLE_ATTRIBUTES_BY_DEFAULT,serviceProviderDO.isEnableAttributesByDefault() ? "true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),NAME_ID_CLAIM_URI,serviceProviderDO.getNameIdClaimUri(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),NAME_ID_FORMAT,serviceProviderDO.getNameIDFormat(),tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SSO_ENABLED,serviceProviderDO.isIdPInitSSOEnabled()?"true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SLO_ENABLED,serviceProviderDO.isIdPInitSLOEnabled()?"true":"false",tenantId));
+        for(String url : serviceProviderDO.getIdpInitSLOReturnToURLs()){
+            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SLO_RETURN_TO_URLS,url,tenantId));
+        }
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_ENABLE_ENCRYPTED_ASSERTION,serviceProviderDO.isDoEnableEncryptedAssertion()?"true":"false",tenantId));
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_VALIDATE_SIGNATURE_IN_REQUESTS,serviceProviderDO.isDoValidateSignatureInRequests()?"true":"false",tenantId));
+
+        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_ENTITY_ID_ALIAS,serviceProviderDO.getIdpEntityIDAlias(),tenantId));
+        return list;
+    }
+
+    private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, SAMLSSOAttribute item) {
+        switch (item.getProp_key()){
+            case ISSUER:
+                samlssoServiceProviderDO.setIssuer(item.getProp_value());
+                break;
+            case ISSUER_QUALIFIER:
+                samlssoServiceProviderDO.setIssuerQualifier(item.getProp_value());
+                break;
+            case ASSERTION_CONSUMER_URLS:
+                String[] arr = samlssoServiceProviderDO.getAssertionConsumerUrls();
+                ArrayList<String> list = new ArrayList<>(Arrays.asList(arr));
+                list.add(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionConsumerUrls(list.toArray(new String[0]));
+                break;
+            case DEFAULT_ASSERTION_CONSUMER_URL:
+                samlssoServiceProviderDO.setDefaultAssertionConsumerUrl(item.getProp_value());
+                break;
+            case SIGNING_ALGORITHM_URI:
+                samlssoServiceProviderDO.setSigningAlgorithmUri(item.getProp_value());
+                break;
+            case DIGEST_ALGORITHM_URI:
+                samlssoServiceProviderDO.setDigestAlgorithmUri(item.getProp_value());
+                break;
+            case ASSERTION_ENCRYPTION_ALGORITHM_URI:
+                samlssoServiceProviderDO.setAssertionEncryptionAlgorithmUri(item.getProp_value());
+                break;
+            case KEY_ENCRYPTION_ALGORITHM_URI:
+                samlssoServiceProviderDO.setKeyEncryptionAlgorithmUri(item.getProp_value());
+                break;
+            case CERT_ALIAS:
+                samlssoServiceProviderDO.setCertAlias(item.getProp_value());
+                break;
+            case ATTRIBUTE_CONSUMING_SERVICE_INDEX:
+                samlssoServiceProviderDO.setAttributeConsumingServiceIndex(item.getProp_value());
+                break;
+            case DO_SIGN_RESPONSE:
+                samlssoServiceProviderDO.setDoSignResponse(item.getProp_value().equals("true"));
+                break;
+            case DO_SINGLE_LOGOUT:
+                samlssoServiceProviderDO.setDoSingleLogout(item.getProp_value().equals("true"));
+                break;
+            case DO_FRONT_CHANNEL_LOGOUT:
+                samlssoServiceProviderDO.setDoFrontChannelLogout(item.getProp_value().equals("true"));
+                break;
+            case FRONT_CHANNEL_LOGOUT_BINDING:
+                samlssoServiceProviderDO.setFrontChannelLogoutBinding(item.getProp_value());
+                break;
+            case IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED:
+                samlssoServiceProviderDO.setAssertionQueryRequestProfileEnabled(item.getProp_value().equals("true"));
+                break;
+            case SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES:
+                samlssoServiceProviderDO.setSupportedAssertionQueryRequestTypes(item.getProp_value());
+                break;
+            case ENABLE_SAML2_ARTIFACT_BINDING:
+                samlssoServiceProviderDO.setEnableSAML2ArtifactBinding(item.getProp_value().equals("true"));
+                break;
+            case DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE:
+                samlssoServiceProviderDO.setDoValidateSignatureInArtifactResolve(item.getProp_value().equals("true"));
+                break;
+            case LOGIN_PAGE_URL:
+                if(item.getProp_value() == null || item.getProp_value().equals("null")){
+                    samlssoServiceProviderDO.setLoginPageURL("");
+                }
+                else{
+                    samlssoServiceProviderDO.setLoginPageURL(item.getProp_value());
+                }
+                break;
+            case SLO_RESPONSE_URL:
+                samlssoServiceProviderDO.setSloResponseURL(item.getProp_value());
+                break;
+            case SLO_REQUEST_URL:
+                samlssoServiceProviderDO.setSloRequestURL(item.getProp_value());
+                break;
+            case REQUESTED_CLAIMS:
+                String[] requestedClaimsArray = samlssoServiceProviderDO.getRequestedClaims();
+                ArrayList<String> requestedClaimsList = new ArrayList<>(Arrays.asList(requestedClaimsArray));
+                requestedClaimsList.add(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionConsumerUrls(requestedClaimsList.toArray(new String[0]));
+                break;
+            case REQUESTED_AUDIENCES:
+                String[] requestedAudiencesArray = samlssoServiceProviderDO.getRequestedAudiences();
+                ArrayList<String> requestedAudiencesList = new ArrayList<>(Arrays.asList(requestedAudiencesArray));
+                requestedAudiencesList.add(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionConsumerUrls(requestedAudiencesList.toArray(new String[0]));
+                break;
+            case REQUESTED_RECIPIENTS:
+                String[] requestedRecipientsArray = samlssoServiceProviderDO.getRequestedRecipients();
+                ArrayList<String> requestedRecipientsList = new ArrayList<>(Arrays.asList(requestedRecipientsArray));
+                requestedRecipientsList.add(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionConsumerUrls(requestedRecipientsList.toArray(new String[0]));
+                break;
+            case ENABLE_ATTRIBUTES_BY_DEFAULT:
+                samlssoServiceProviderDO.setEnableAttributesByDefault(item.getProp_value().equals("true"));
+                break;
+            case NAME_ID_CLAIM_URI:
+                samlssoServiceProviderDO.setNameIdClaimUri(item.getProp_value());
+                break;
+            case NAME_ID_FORMAT:
+                samlssoServiceProviderDO.setNameIDFormat(item.getProp_value());
+                if (samlssoServiceProviderDO.getNameIDFormat() == null) {
+                    samlssoServiceProviderDO.setNameIDFormat(NameIdentifier.EMAIL);
+                }
+                samlssoServiceProviderDO.setNameIDFormat(samlssoServiceProviderDO.getNameIDFormat().replace(":", "/"));
+                break;
+            case IDP_INIT_SSO_ENABLED:
+                samlssoServiceProviderDO.setIdPInitSSOEnabled(item.getProp_value().equals("true"));
+                break;
+            case IDP_INIT_SLO_ENABLED:
+                samlssoServiceProviderDO.setIdPInitSLOEnabled(item.getProp_value().equals("true"));
+                break;
+            case IDP_INIT_SLO_RETURN_TO_URLS:
+                String[] idpInitSLOReturnToURLsArray = samlssoServiceProviderDO.getIdpInitSLOReturnToURLs();
+                ArrayList<String> idpInitSLOReturnToURLsList = new ArrayList<>(Arrays.asList(idpInitSLOReturnToURLsArray));
+                idpInitSLOReturnToURLsList.add(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionConsumerUrls(idpInitSLOReturnToURLsList.toArray(new String[0]));
+                break;
+            case DO_ENABLE_ENCRYPTED_ASSERTION:
+                samlssoServiceProviderDO.setDoEnableEncryptedAssertion(item.getProp_value().equals("true"));
+                break;
+            case DO_VALIDATE_SIGNATURE_IN_REQUESTS:
+                samlssoServiceProviderDO.setDoValidateSignatureInRequests(item.getProp_value().equals("true"));
+                break;
+            case IDP_ENTITY_ID_ALIAS:
+                samlssoServiceProviderDO.setIdpEntityIDAlias(item.getProp_value());
+                break;
+        }
+        return samlssoServiceProviderDO;
+    }
+
+
 }

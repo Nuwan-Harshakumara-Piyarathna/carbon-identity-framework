@@ -238,6 +238,7 @@ public class IdentityPersistenceManager {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
         return serviceProviderDAO.addServiceProvider(serviceProviderDO);
     }
+
     /**
      * Upload Service Provider
      *
