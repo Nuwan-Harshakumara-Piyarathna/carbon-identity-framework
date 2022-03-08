@@ -299,7 +299,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
                     serviceProviderDO.getIssuerQualifier()));
         }
-        addServiceProvider_new(serviceProviderDO);
 
         String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(serviceProviderDO.getIssuer());
 
@@ -364,6 +363,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
                     serviceProviderDO.getIssuerQualifier()));
         }
+
+        if(isServiceProviderExists_new(serviceProviderDO.getIssuer())){
+            //TODO : error handling
+            return false;
+        }
+
         HashMap<String,String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
         String issuerName = serviceProviderDO.getIssuer();
         int tenantId = getTenantId();
@@ -576,24 +581,32 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public SAMLSSOServiceProviderDO[] getServiceProviders_new() throws IdentityException {
-        List<SAMLSSOServiceProviderDO> serviceProvidersList = new ArrayList<>();
+        HashMap<String,SAMLSSOServiceProviderDO> serviceProvidersMap = new HashMap<>();
+        PreparedStatement prepStmt = null;
+        ResultSet results = null;
+        int tenantId = getTenantId();
+        Connection connection = IdentityDatabaseUtil.getDBConnection(true);
         try {
-            if (registry.resourceExists(IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS)) {
-                Resource samlSSOServiceProvidersResource = registry.get(IdentityRegistryResources
-                        .SAML_SSO_SERVICE_PROVIDERS);
-                if (samlSSOServiceProvidersResource instanceof Collection) {
-                    Collection samlSSOServiceProvidersCollection = (Collection) samlSSOServiceProvidersResource;
-                    String[] resources = samlSSOServiceProvidersCollection.getChildren();
-                    for (String resource : resources) {
-                        getChildResources(resource, serviceProvidersList);
-                    }
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APPS);
+            prepStmt.setInt(1, tenantId);
+            results = prepStmt.executeQuery();
+            while (results.next()) {
+                if(serviceProvidersMap.containsKey(results.getString(2))){
+                    SAMLSSOServiceProviderDO samlssoServiceProviderDO = serviceProvidersMap.get(results.getString(2));
+                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO,results.getString(3), results.getString(4)));
+                }
+                else {
+                    SAMLSSOServiceProviderDO samlssoServiceProviderDO = new SAMLSSOServiceProviderDO();
+                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO,results.getString(3), results.getString(4)));
                 }
             }
-        } catch (RegistryException e) {
-            log.error("Error reading Service Providers from Registry", e);
-            throw IdentityException.error("Error reading Service Providers from Registry", e);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            IdentityDatabaseUtil.closeResultSet(results);
+            IdentityDatabaseUtil.closeStatement(prepStmt);
         }
-        return serviceProvidersList.toArray(new SAMLSSOServiceProviderDO[serviceProvidersList.size()]);
+        return serviceProvidersMap.values().toArray(new SAMLSSOServiceProviderDO[serviceProvidersMap.size()]);
     }
 
     /**
@@ -640,8 +653,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         if (issuer == null || StringUtils.isEmpty(issuer.trim())) {
             throw new IllegalArgumentException("Trying to delete issuer \'" + issuer + "\'");
         }
+        if(!isServiceProviderExists_new(issuer)){
+            //TODO : error handling
+            return false;
+        }
         int tenantId = getTenantId();
-        Connection connection = IdentityDatabaseUtil.getDBConnection();
+        Connection connection = IdentityDatabaseUtil.getDBConnection(false);
         PreparedStatement prepStmt = null;
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.REMOVE_SAML_APP_BY_ISSUER_NAME);
@@ -708,27 +725,25 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public SAMLSSOServiceProviderDO getServiceProvider_new(String issuer) throws IdentityException {
-
+        if(!isServiceProviderExists_new(issuer)){
+            //TODO : error handling
+            return null;
+        }
         SAMLSSOServiceProviderDO serviceProviderDO = null;
-
-        Map<String, String> dataValues = new HashMap<>();
         PreparedStatement prepStmt = null;
         ResultSet results = null;
+        int tenantId = getTenantId();
+        Connection connection = IdentityDatabaseUtil.getDBConnection(true);
         try {
-            boolean isUsernameCaseSensitive = IdentityUtil.isUserStoreInUsernameCaseSensitive(userName, tenantId);
-            String query;
-            if (isUsernameCaseSensitive) {
-                query = SQLQuery.LOAD_USER_DATA;
-            } else {
-                query = SQLQuery.LOAD_USER_DATA_CASE_INSENSITIVE;
-            }
-            prepStmt = connection.prepareStatement(query);
-            prepStmt.setInt(1, tenantId);
-            prepStmt.setString(2, userName);
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APP_ALL_ATTRIBUTES_BY_ISSUER_NAME);
+            prepStmt.setString(1, issuer);
+            prepStmt.setInt(2, tenantId);
             results = prepStmt.executeQuery();
             while (results.next()) {
-                dataValues.put(results.getString(1), results.getString(2));
+                updateServiceProviderDO(serviceProviderDO,results.getString(3), results.getString(4));
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         } finally {
             IdentityDatabaseUtil.closeResultSet(results);
             IdentityDatabaseUtil.closeStatement(prepStmt);
@@ -806,6 +821,28 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             throw IdentityException.error("Error occurred while checking if resource path \'" + path + "\' exists in " +
                     "registry");
         }
+    }
+
+    public boolean isServiceProviderExists_new(String issuer) throws IdentityException {
+        PreparedStatement prepStmt = null;
+        ResultSet results = null;
+        int tenantId = getTenantId();
+        Connection connection = IdentityDatabaseUtil.getDBConnection(true);
+        try {
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APP_SINGLE_ATTRIBUTE_BY_ISSUER_NAME);
+            prepStmt.setString(1, issuer);
+            prepStmt.setInt(2, tenantId);
+            results = prepStmt.executeQuery();
+            while (results.next()) {
+                return true;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            IdentityDatabaseUtil.closeResultSet(results);
+            IdentityDatabaseUtil.closeStatement(prepStmt);
+        }
+        return false;
     }
 
     private String encodePath(String path) {
