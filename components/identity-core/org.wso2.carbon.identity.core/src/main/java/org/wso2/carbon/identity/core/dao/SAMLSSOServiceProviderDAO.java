@@ -47,10 +47,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static org.wso2.carbon.identity.core.util.JdbcUtils.isH2DB;
 
@@ -292,7 +289,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
      * @throws IdentityException Error while persisting to the registry.
      */
     public boolean addServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws IdentityException {
-
         if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null ||
                 StringUtils.isBlank(serviceProviderDO.getIssuer())) {
             throw new IdentityException("Issuer cannot be found in the provided arguments.");
@@ -303,6 +299,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
                     serviceProviderDO.getIssuerQualifier()));
         }
+        addServiceProvider_new(serviceProviderDO);
 
         String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(serviceProviderDO.getIssuer());
 
@@ -370,6 +367,26 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         HashMap<String,String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
         String issuerName = serviceProviderDO.getIssuer();
         int tenantId = getTenantId();
+
+        Connection connection = IdentityDatabaseUtil.getDBConnection(true);
+
+        PreparedStatement prepStmt = null;
+
+        try {
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.ADD_SAML_APP);
+            for (Map.Entry<String, String> entry : pairMap.entrySet()) {
+                prepStmt.setString(1, issuerName);
+                prepStmt.setString(2, entry.getKey());
+                prepStmt.setString(3, entry.getValue());
+                prepStmt.setInt(4, tenantId);
+                prepStmt.addBatch();
+            }
+            prepStmt.executeBatch();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            IdentityDatabaseUtil.closeStatement(prepStmt);
+        }
 
 
         return true;
@@ -558,6 +575,27 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return serviceProvidersList.toArray(new SAMLSSOServiceProviderDO[serviceProvidersList.size()]);
     }
 
+    public SAMLSSOServiceProviderDO[] getServiceProviders_new() throws IdentityException {
+        List<SAMLSSOServiceProviderDO> serviceProvidersList = new ArrayList<>();
+        try {
+            if (registry.resourceExists(IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS)) {
+                Resource samlSSOServiceProvidersResource = registry.get(IdentityRegistryResources
+                        .SAML_SSO_SERVICE_PROVIDERS);
+                if (samlSSOServiceProvidersResource instanceof Collection) {
+                    Collection samlSSOServiceProvidersCollection = (Collection) samlSSOServiceProvidersResource;
+                    String[] resources = samlSSOServiceProvidersCollection.getChildren();
+                    for (String resource : resources) {
+                        getChildResources(resource, serviceProvidersList);
+                    }
+                }
+            }
+        } catch (RegistryException e) {
+            log.error("Error reading Service Providers from Registry", e);
+            throw IdentityException.error("Error reading Service Providers from Registry", e);
+        }
+        return serviceProvidersList.toArray(new SAMLSSOServiceProviderDO[serviceProvidersList.size()]);
+    }
+
     /**
      * Remove the service provider with the given name.
      * @return True if deletion success.
@@ -596,6 +634,28 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         } finally {
             commitOrRollbackTransaction(isErrorOccurred);
         }
+    }
+
+    public boolean removeServiceProvider_new(String issuer) throws IdentityException {
+        if (issuer == null || StringUtils.isEmpty(issuer.trim())) {
+            throw new IllegalArgumentException("Trying to delete issuer \'" + issuer + "\'");
+        }
+        int tenantId = getTenantId();
+        Connection connection = IdentityDatabaseUtil.getDBConnection();
+        PreparedStatement prepStmt = null;
+        try {
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.REMOVE_SAML_APP_BY_ISSUER_NAME);
+            prepStmt.setString(1, issuer);
+            prepStmt.setInt(2, tenantId);
+            prepStmt.execute();
+            IdentityDatabaseUtil.commitTransaction(connection);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            IdentityDatabaseUtil.closeStatement(prepStmt);
+            IdentityDatabaseUtil.closeConnection(connection);
+        }
+        return true;
     }
 
     /**
@@ -643,6 +703,35 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         } catch (CertificateRetrievingException e) {
             throw IdentityException.error(String.format("An error occurred while getting the " +
                     "application certificate for validating the requests from the issuer '%s'", issuer), e);
+        }
+        return serviceProviderDO;
+    }
+
+    public SAMLSSOServiceProviderDO getServiceProvider_new(String issuer) throws IdentityException {
+
+        SAMLSSOServiceProviderDO serviceProviderDO = null;
+
+        Map<String, String> dataValues = new HashMap<>();
+        PreparedStatement prepStmt = null;
+        ResultSet results = null;
+        try {
+            boolean isUsernameCaseSensitive = IdentityUtil.isUserStoreInUsernameCaseSensitive(userName, tenantId);
+            String query;
+            if (isUsernameCaseSensitive) {
+                query = SQLQuery.LOAD_USER_DATA;
+            } else {
+                query = SQLQuery.LOAD_USER_DATA_CASE_INSENSITIVE;
+            }
+            prepStmt = connection.prepareStatement(query);
+            prepStmt.setInt(1, tenantId);
+            prepStmt.setString(2, userName);
+            results = prepStmt.executeQuery();
+            while (results.next()) {
+                dataValues.put(results.getString(1), results.getString(2));
+            }
+        } finally {
+            IdentityDatabaseUtil.closeResultSet(results);
+            IdentityDatabaseUtil.closeStatement(prepStmt);
         }
         return serviceProviderDO;
     }
@@ -884,130 +973,130 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return pairMap;
     }
 
-    private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, SAMLSSOAttribute item) {
-        switch (item.getProp_key()){
+    private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, String key,String value) {
+        switch (key){
             case ISSUER:
-                samlssoServiceProviderDO.setIssuer(item.getProp_value());
+                samlssoServiceProviderDO.setIssuer(value);
                 break;
             case ISSUER_QUALIFIER:
-                samlssoServiceProviderDO.setIssuerQualifier(item.getProp_value());
+                samlssoServiceProviderDO.setIssuerQualifier(value);
                 break;
             case ASSERTION_CONSUMER_URLS:
                 String[] arr = samlssoServiceProviderDO.getAssertionConsumerUrls();
                 ArrayList<String> list = new ArrayList<>(Arrays.asList(arr));
-                list.add(item.getProp_value());
+                list.add(value);
                 samlssoServiceProviderDO.setAssertionConsumerUrls(list.toArray(new String[0]));
                 break;
             case DEFAULT_ASSERTION_CONSUMER_URL:
-                samlssoServiceProviderDO.setDefaultAssertionConsumerUrl(item.getProp_value());
+                samlssoServiceProviderDO.setDefaultAssertionConsumerUrl(value);
                 break;
             case SIGNING_ALGORITHM_URI:
-                samlssoServiceProviderDO.setSigningAlgorithmUri(item.getProp_value());
+                samlssoServiceProviderDO.setSigningAlgorithmUri(value);
                 break;
             case DIGEST_ALGORITHM_URI:
-                samlssoServiceProviderDO.setDigestAlgorithmUri(item.getProp_value());
+                samlssoServiceProviderDO.setDigestAlgorithmUri(value);
                 break;
             case ASSERTION_ENCRYPTION_ALGORITHM_URI:
-                samlssoServiceProviderDO.setAssertionEncryptionAlgorithmUri(item.getProp_value());
+                samlssoServiceProviderDO.setAssertionEncryptionAlgorithmUri(value);
                 break;
             case KEY_ENCRYPTION_ALGORITHM_URI:
-                samlssoServiceProviderDO.setKeyEncryptionAlgorithmUri(item.getProp_value());
+                samlssoServiceProviderDO.setKeyEncryptionAlgorithmUri(value);
                 break;
             case CERT_ALIAS:
-                samlssoServiceProviderDO.setCertAlias(item.getProp_value());
+                samlssoServiceProviderDO.setCertAlias(value);
                 break;
             case ATTRIBUTE_CONSUMING_SERVICE_INDEX:
-                samlssoServiceProviderDO.setAttributeConsumingServiceIndex(item.getProp_value());
+                samlssoServiceProviderDO.setAttributeConsumingServiceIndex(value);
                 break;
             case DO_SIGN_RESPONSE:
-                samlssoServiceProviderDO.setDoSignResponse(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoSignResponse(value.equals("true"));
                 break;
             case DO_SINGLE_LOGOUT:
-                samlssoServiceProviderDO.setDoSingleLogout(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoSingleLogout(value.equals("true"));
                 break;
             case DO_FRONT_CHANNEL_LOGOUT:
-                samlssoServiceProviderDO.setDoFrontChannelLogout(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoFrontChannelLogout(value.equals("true"));
                 break;
             case FRONT_CHANNEL_LOGOUT_BINDING:
-                samlssoServiceProviderDO.setFrontChannelLogoutBinding(item.getProp_value());
+                samlssoServiceProviderDO.setFrontChannelLogoutBinding(value);
                 break;
             case IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED:
-                samlssoServiceProviderDO.setAssertionQueryRequestProfileEnabled(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setAssertionQueryRequestProfileEnabled(value.equals("true"));
                 break;
             case SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES:
-                samlssoServiceProviderDO.setSupportedAssertionQueryRequestTypes(item.getProp_value());
+                samlssoServiceProviderDO.setSupportedAssertionQueryRequestTypes(value);
                 break;
             case ENABLE_SAML2_ARTIFACT_BINDING:
-                samlssoServiceProviderDO.setEnableSAML2ArtifactBinding(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setEnableSAML2ArtifactBinding(value.equals("true"));
                 break;
             case DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE:
-                samlssoServiceProviderDO.setDoValidateSignatureInArtifactResolve(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoValidateSignatureInArtifactResolve(value.equals("true"));
                 break;
             case LOGIN_PAGE_URL:
-                if(item.getProp_value() == null || item.getProp_value().equals("null")){
+                if(value == null || value.equals("null")){
                     samlssoServiceProviderDO.setLoginPageURL("");
                 }
                 else{
-                    samlssoServiceProviderDO.setLoginPageURL(item.getProp_value());
+                    samlssoServiceProviderDO.setLoginPageURL(value);
                 }
                 break;
             case SLO_RESPONSE_URL:
-                samlssoServiceProviderDO.setSloResponseURL(item.getProp_value());
+                samlssoServiceProviderDO.setSloResponseURL(value);
                 break;
             case SLO_REQUEST_URL:
-                samlssoServiceProviderDO.setSloRequestURL(item.getProp_value());
+                samlssoServiceProviderDO.setSloRequestURL(value);
                 break;
             case REQUESTED_CLAIMS:
                 String[] requestedClaimsArray = samlssoServiceProviderDO.getRequestedClaims();
                 ArrayList<String> requestedClaimsList = new ArrayList<>(Arrays.asList(requestedClaimsArray));
-                requestedClaimsList.add(item.getProp_value());
+                requestedClaimsList.add(value);
                 samlssoServiceProviderDO.setAssertionConsumerUrls(requestedClaimsList.toArray(new String[0]));
                 break;
             case REQUESTED_AUDIENCES:
                 String[] requestedAudiencesArray = samlssoServiceProviderDO.getRequestedAudiences();
                 ArrayList<String> requestedAudiencesList = new ArrayList<>(Arrays.asList(requestedAudiencesArray));
-                requestedAudiencesList.add(item.getProp_value());
+                requestedAudiencesList.add(value);
                 samlssoServiceProviderDO.setAssertionConsumerUrls(requestedAudiencesList.toArray(new String[0]));
                 break;
             case REQUESTED_RECIPIENTS:
                 String[] requestedRecipientsArray = samlssoServiceProviderDO.getRequestedRecipients();
                 ArrayList<String> requestedRecipientsList = new ArrayList<>(Arrays.asList(requestedRecipientsArray));
-                requestedRecipientsList.add(item.getProp_value());
+                requestedRecipientsList.add(value);
                 samlssoServiceProviderDO.setAssertionConsumerUrls(requestedRecipientsList.toArray(new String[0]));
                 break;
             case ENABLE_ATTRIBUTES_BY_DEFAULT:
-                samlssoServiceProviderDO.setEnableAttributesByDefault(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setEnableAttributesByDefault(value.equals("true"));
                 break;
             case NAME_ID_CLAIM_URI:
-                samlssoServiceProviderDO.setNameIdClaimUri(item.getProp_value());
+                samlssoServiceProviderDO.setNameIdClaimUri(value);
                 break;
             case NAME_ID_FORMAT:
-                samlssoServiceProviderDO.setNameIDFormat(item.getProp_value());
+                samlssoServiceProviderDO.setNameIDFormat(value);
                 if (samlssoServiceProviderDO.getNameIDFormat() == null) {
                     samlssoServiceProviderDO.setNameIDFormat(NameIdentifier.EMAIL);
                 }
                 samlssoServiceProviderDO.setNameIDFormat(samlssoServiceProviderDO.getNameIDFormat().replace(":", "/"));
                 break;
             case IDP_INIT_SSO_ENABLED:
-                samlssoServiceProviderDO.setIdPInitSSOEnabled(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setIdPInitSSOEnabled(value.equals("true"));
                 break;
             case IDP_INIT_SLO_ENABLED:
-                samlssoServiceProviderDO.setIdPInitSLOEnabled(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setIdPInitSLOEnabled(value.equals("true"));
                 break;
             case IDP_INIT_SLO_RETURN_TO_URLS:
                 String[] idpInitSLOReturnToURLsArray = samlssoServiceProviderDO.getIdpInitSLOReturnToURLs();
                 ArrayList<String> idpInitSLOReturnToURLsList = new ArrayList<>(Arrays.asList(idpInitSLOReturnToURLsArray));
-                idpInitSLOReturnToURLsList.add(item.getProp_value());
+                idpInitSLOReturnToURLsList.add(value);
                 samlssoServiceProviderDO.setAssertionConsumerUrls(idpInitSLOReturnToURLsList.toArray(new String[0]));
                 break;
             case DO_ENABLE_ENCRYPTED_ASSERTION:
-                samlssoServiceProviderDO.setDoEnableEncryptedAssertion(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoEnableEncryptedAssertion(value.equals("true"));
                 break;
             case DO_VALIDATE_SIGNATURE_IN_REQUESTS:
-                samlssoServiceProviderDO.setDoValidateSignatureInRequests(item.getProp_value().equals("true"));
+                samlssoServiceProviderDO.setDoValidateSignatureInRequests(value.equals("true"));
                 break;
             case IDP_ENTITY_ID_ALIAS:
-                samlssoServiceProviderDO.setIdpEntityIDAlias(item.getProp_value());
+                samlssoServiceProviderDO.setIdpEntityIDAlias(value);
                 break;
         }
         return samlssoServiceProviderDO;
