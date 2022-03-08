@@ -49,6 +49,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import static org.wso2.carbon.identity.core.util.JdbcUtils.isH2DB;
@@ -366,8 +367,17 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
                     serviceProviderDO.getIssuerQualifier()));
         }
+        HashMap<String,String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
+        String issuerName = serviceProviderDO.getIssuer();
+        int tenantId = getTenantId();
+
 
         return true;
+    }
+
+    private int getTenantId(){
+        UserRegistry userRegistry = (UserRegistry) registry;
+        return userRegistry.getTenantId();
     }
 
     private Resource createResource(SAMLSSOServiceProviderDO serviceProviderDO) throws RegistryException {
@@ -823,55 +833,55 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         }
     }
 
-    public List<SAMLSSOAttribute> convertServiceProviderToList(SAMLSSOServiceProviderDO serviceProviderDO) {
+    public HashMap<String,String> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO serviceProviderDO) {
         UserRegistry userRegistry = (UserRegistry) registry;
         int tenantId = userRegistry.getTenantId();
-        List<SAMLSSOAttribute> list = new ArrayList<>();
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ISSUER,serviceProviderDO.getIssuer(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ISSUER_QUALIFIER,serviceProviderDO.getIssuerQualifier(),tenantId));
+        HashMap<String,String> pairMap = new HashMap<>();
+        pairMap.put(ISSUER,serviceProviderDO.getIssuer());
+        pairMap.put(ISSUER_QUALIFIER,serviceProviderDO.getIssuerQualifier());
         for(String url : serviceProviderDO.getAssertionConsumerUrls()){
-            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ASSERTION_CONSUMER_URLS,url,tenantId));
+            pairMap.put(ASSERTION_CONSUMER_URLS,url);
         }
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DEFAULT_ASSERTION_CONSUMER_URL,serviceProviderDO.getDefaultAssertionConsumerUrl(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SIGNING_ALGORITHM_URI,serviceProviderDO.getSigningAlgorithmUri(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DIGEST_ALGORITHM_URI,serviceProviderDO.getDigestAlgorithmUri(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ASSERTION_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getAssertionEncryptionAlgorithmUri(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),KEY_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getKeyEncryptionAlgorithmUri(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),CERT_ALIAS,serviceProviderDO.getCertAlias(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ATTRIBUTE_CONSUMING_SERVICE_INDEX,serviceProviderDO.getAttributeConsumingServiceIndex(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_SIGN_RESPONSE,serviceProviderDO.isDoSignResponse() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_SINGLE_LOGOUT,serviceProviderDO.isDoSingleLogout() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_FRONT_CHANNEL_LOGOUT,serviceProviderDO.isDoFrontChannelLogout() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),FRONT_CHANNEL_LOGOUT_BINDING,serviceProviderDO.getFrontChannelLogoutBinding(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED,serviceProviderDO.isAssertionQueryRequestProfileEnabled() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES,serviceProviderDO.getSupportedAssertionQueryRequestTypes(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ENABLE_SAML2_ARTIFACT_BINDING,serviceProviderDO.isEnableSAML2ArtifactBinding() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE,serviceProviderDO.isDoValidateSignatureInArtifactResolve() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),LOGIN_PAGE_URL,serviceProviderDO.getLoginPageURL(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SLO_RESPONSE_URL,serviceProviderDO.getSloResponseURL(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),SLO_REQUEST_URL,serviceProviderDO.getSloRequestURL(),tenantId));
+        pairMap.put(DEFAULT_ASSERTION_CONSUMER_URL,serviceProviderDO.getDefaultAssertionConsumerUrl());
+        pairMap.put(SIGNING_ALGORITHM_URI,serviceProviderDO.getSigningAlgorithmUri());
+        pairMap.put(DIGEST_ALGORITHM_URI,serviceProviderDO.getDigestAlgorithmUri());
+        pairMap.put(ASSERTION_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getAssertionEncryptionAlgorithmUri());
+        pairMap.put(KEY_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getKeyEncryptionAlgorithmUri());
+        pairMap.put(CERT_ALIAS,serviceProviderDO.getCertAlias());
+        pairMap.put(ATTRIBUTE_CONSUMING_SERVICE_INDEX,serviceProviderDO.getAttributeConsumingServiceIndex());
+        pairMap.put(DO_SIGN_RESPONSE,serviceProviderDO.isDoSignResponse() ? "true":"false");
+        pairMap.put(DO_SINGLE_LOGOUT,serviceProviderDO.isDoSingleLogout() ? "true":"false");
+        pairMap.put(DO_FRONT_CHANNEL_LOGOUT,serviceProviderDO.isDoFrontChannelLogout() ? "true":"false");
+        pairMap.put(FRONT_CHANNEL_LOGOUT_BINDING,serviceProviderDO.getFrontChannelLogoutBinding());
+        pairMap.put(IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED,serviceProviderDO.isAssertionQueryRequestProfileEnabled() ? "true":"false");
+        pairMap.put(SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES,serviceProviderDO.getSupportedAssertionQueryRequestTypes());
+        pairMap.put(ENABLE_SAML2_ARTIFACT_BINDING,serviceProviderDO.isEnableSAML2ArtifactBinding() ? "true":"false");
+        pairMap.put(DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE,serviceProviderDO.isDoValidateSignatureInArtifactResolve() ? "true":"false");
+        pairMap.put(LOGIN_PAGE_URL,serviceProviderDO.getLoginPageURL());
+        pairMap.put(SLO_RESPONSE_URL,serviceProviderDO.getSloResponseURL());
+        pairMap.put(SLO_REQUEST_URL,serviceProviderDO.getSloRequestURL());
         for(String claim : serviceProviderDO.getRequestedClaims()){
-            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_CLAIMS,claim,tenantId));
+            pairMap.put(REQUESTED_CLAIMS,claim);
         }
         for(String audience : serviceProviderDO.getRequestedAudiences()){
-            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_AUDIENCES,audience,tenantId));
+            pairMap.put(REQUESTED_AUDIENCES,audience);
         }
         for(String recipient : serviceProviderDO.getRequestedRecipients()){
-            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),REQUESTED_RECIPIENTS,recipient,tenantId));
+            pairMap.put(REQUESTED_RECIPIENTS,recipient);
         }
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),ENABLE_ATTRIBUTES_BY_DEFAULT,serviceProviderDO.isEnableAttributesByDefault() ? "true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),NAME_ID_CLAIM_URI,serviceProviderDO.getNameIdClaimUri(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),NAME_ID_FORMAT,serviceProviderDO.getNameIDFormat(),tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SSO_ENABLED,serviceProviderDO.isIdPInitSSOEnabled()?"true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SLO_ENABLED,serviceProviderDO.isIdPInitSLOEnabled()?"true":"false",tenantId));
+        pairMap.put(ENABLE_ATTRIBUTES_BY_DEFAULT,serviceProviderDO.isEnableAttributesByDefault() ? "true":"false");
+        pairMap.put(NAME_ID_CLAIM_URI,serviceProviderDO.getNameIdClaimUri());
+        pairMap.put(NAME_ID_FORMAT,serviceProviderDO.getNameIDFormat());
+        pairMap.put(IDP_INIT_SSO_ENABLED,serviceProviderDO.isIdPInitSSOEnabled()?"true":"false");
+        pairMap.put(IDP_INIT_SLO_ENABLED,serviceProviderDO.isIdPInitSLOEnabled()?"true":"false");
         for(String url : serviceProviderDO.getIdpInitSLOReturnToURLs()){
-            list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_INIT_SLO_RETURN_TO_URLS,url,tenantId));
+            pairMap.put(IDP_INIT_SLO_RETURN_TO_URLS,url);
         }
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_ENABLE_ENCRYPTED_ASSERTION,serviceProviderDO.isDoEnableEncryptedAssertion()?"true":"false",tenantId));
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),DO_VALIDATE_SIGNATURE_IN_REQUESTS,serviceProviderDO.isDoValidateSignatureInRequests()?"true":"false",tenantId));
+        pairMap.put(DO_ENABLE_ENCRYPTED_ASSERTION,serviceProviderDO.isDoEnableEncryptedAssertion()?"true":"false");
+        pairMap.put(DO_VALIDATE_SIGNATURE_IN_REQUESTS,serviceProviderDO.isDoValidateSignatureInRequests()?"true":"false");
 
-        list.add(new SAMLSSOAttribute(serviceProviderDO.getIssuer(),IDP_ENTITY_ID_ALIAS,serviceProviderDO.getIdpEntityIDAlias(),tenantId));
-        return list;
+        pairMap.put(IDP_ENTITY_ID_ALIAS,serviceProviderDO.getIdpEntityIDAlias());
+        return pairMap;
     }
 
     private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, SAMLSSOAttribute item) {
