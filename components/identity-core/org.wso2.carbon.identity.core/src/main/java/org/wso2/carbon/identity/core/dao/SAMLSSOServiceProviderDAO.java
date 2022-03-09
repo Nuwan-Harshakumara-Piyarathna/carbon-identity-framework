@@ -1,12 +1,12 @@
 /*
  * Copyright 2005-2007 WSO2, Inc. (http://wso2.com)
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -100,6 +100,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
     public SAMLSSOServiceProviderDAO(Registry registry) {
         this.registry = registry;
+    }
+
+    private int tenantId;
+
+    public SAMLSSOServiceProviderDAO(int tenantId) {
+        this.tenantId = tenantId;
     }
 
     protected SAMLSSOServiceProviderDO resourceToObject(Resource resource) {
@@ -284,6 +290,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
     /**
      * Add the service provider information to the registry.
+     *
      * @param serviceProviderDO Service provider information object.
      * @return True if addition successful.
      * @throws IdentityException Error while persisting to the registry.
@@ -364,12 +371,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                     serviceProviderDO.getIssuerQualifier()));
         }
 
-        if(isServiceProviderExists_new(serviceProviderDO.getIssuer())){
+        if (isServiceProviderExists_new(serviceProviderDO.getIssuer())) {
             //TODO : error handling
             return false;
         }
 
-        HashMap<String,String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
+        HashMap<String, String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
         String issuerName = serviceProviderDO.getIssuer();
         int tenantId = getTenantId();
 
@@ -397,7 +404,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return true;
     }
 
-    private int getTenantId(){
+    private int getTenantId() {
         UserRegistry userRegistry = (UserRegistry) registry;
         return userRegistry.getTenantId();
     }
@@ -581,7 +588,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public SAMLSSOServiceProviderDO[] getServiceProviders_new() throws IdentityException {
-        HashMap<String,SAMLSSOServiceProviderDO> serviceProvidersMap = new HashMap<>();
+        HashMap<String, SAMLSSOServiceProviderDO> serviceProvidersMap = new HashMap<>();
         PreparedStatement prepStmt = null;
         ResultSet results = null;
         int tenantId = getTenantId();
@@ -591,13 +598,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             prepStmt.setInt(1, tenantId);
             results = prepStmt.executeQuery();
             while (results.next()) {
-                if(serviceProvidersMap.containsKey(results.getString(2))){
+                if (serviceProvidersMap.containsKey(results.getString(2))) {
                     SAMLSSOServiceProviderDO samlssoServiceProviderDO = serviceProvidersMap.get(results.getString(2));
-                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO,results.getString(3), results.getString(4)));
-                }
-                else {
+                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO, results.getString(3), results.getString(4)));
+                } else {
                     SAMLSSOServiceProviderDO samlssoServiceProviderDO = new SAMLSSOServiceProviderDO();
-                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO,results.getString(3), results.getString(4)));
+                    serviceProvidersMap.put(results.getString(2), updateServiceProviderDO(samlssoServiceProviderDO, results.getString(3), results.getString(4)));
                 }
             }
         } catch (SQLException e) {
@@ -606,13 +612,14 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             IdentityDatabaseUtil.closeResultSet(results);
             IdentityDatabaseUtil.closeStatement(prepStmt);
         }
-        return serviceProvidersMap.values().toArray(new SAMLSSOServiceProviderDO[serviceProvidersMap.size()]);
+        return serviceProvidersMap.values().toArray(new SAMLSSOServiceProviderDO[0]);
     }
 
     /**
      * Remove the service provider with the given name.
-     * @return True if deletion success.
+     *
      * @param issuer Name of the SAML issuer.
+     * @return True if deletion success.
      * @throws IdentityException Error occurred while removing the SAML service provider from registry.
      */
     public boolean removeServiceProvider(String issuer) throws IdentityException {
@@ -653,7 +660,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         if (issuer == null || StringUtils.isEmpty(issuer.trim())) {
             throw new IllegalArgumentException("Trying to delete issuer \'" + issuer + "\'");
         }
-        if(!isServiceProviderExists_new(issuer)){
+        if (!isServiceProviderExists_new(issuer)) {
             //TODO : error handling
             return false;
         }
@@ -725,7 +732,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public SAMLSSOServiceProviderDO getServiceProvider_new(String issuer) throws IdentityException {
-        if(!isServiceProviderExists_new(issuer)){
+        if (!isServiceProviderExists_new(issuer)) {
             //TODO : error handling
             return null;
         }
@@ -740,7 +747,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             prepStmt.setInt(2, tenantId);
             results = prepStmt.executeQuery();
             while (results.next()) {
-                updateServiceProviderDO(serviceProviderDO,results.getString(3), results.getString(4));
+                updateServiceProviderDO(serviceProviderDO, results.getString(3), results.getString(4));
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -833,7 +840,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             prepStmt.setString(1, issuer);
             prepStmt.setInt(2, tenantId);
             results = prepStmt.executeQuery();
-            while (results.next()) {
+            if (results.next()) {
                 return true;
             }
         } catch (SQLException e) {
@@ -852,6 +859,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
     /**
      * Upload service Provider using metadata file..
+     *
      * @param serviceProviderDO Service provider information object.
      * @return True if upload success.
      * @throws IdentityException Error occurred while adding the information to registry.
@@ -918,6 +926,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
     /**
      * Commit or rollback the registry operation depends on the error condition.
+     *
      * @param isErrorOccurred Identifier for error transactions.
      * @throws IdentityException Error while committing or running rollback on the transaction.
      */
@@ -959,59 +968,59 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         }
     }
 
-    public HashMap<String,String> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO serviceProviderDO) {
+    public HashMap<String, String> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO serviceProviderDO) {
         UserRegistry userRegistry = (UserRegistry) registry;
         int tenantId = userRegistry.getTenantId();
-        HashMap<String,String> pairMap = new HashMap<>();
-        pairMap.put(ISSUER,serviceProviderDO.getIssuer());
-        pairMap.put(ISSUER_QUALIFIER,serviceProviderDO.getIssuerQualifier());
-        for(String url : serviceProviderDO.getAssertionConsumerUrls()){
-            pairMap.put(ASSERTION_CONSUMER_URLS,url);
+        HashMap<String, String> pairMap = new HashMap<>();
+        pairMap.put(ISSUER, serviceProviderDO.getIssuer());
+        pairMap.put(ISSUER_QUALIFIER, serviceProviderDO.getIssuerQualifier());
+        for (String url : serviceProviderDO.getAssertionConsumerUrls()) {
+            pairMap.put(ASSERTION_CONSUMER_URLS, url);
         }
-        pairMap.put(DEFAULT_ASSERTION_CONSUMER_URL,serviceProviderDO.getDefaultAssertionConsumerUrl());
-        pairMap.put(SIGNING_ALGORITHM_URI,serviceProviderDO.getSigningAlgorithmUri());
-        pairMap.put(DIGEST_ALGORITHM_URI,serviceProviderDO.getDigestAlgorithmUri());
-        pairMap.put(ASSERTION_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getAssertionEncryptionAlgorithmUri());
-        pairMap.put(KEY_ENCRYPTION_ALGORITHM_URI,serviceProviderDO.getKeyEncryptionAlgorithmUri());
-        pairMap.put(CERT_ALIAS,serviceProviderDO.getCertAlias());
-        pairMap.put(ATTRIBUTE_CONSUMING_SERVICE_INDEX,serviceProviderDO.getAttributeConsumingServiceIndex());
-        pairMap.put(DO_SIGN_RESPONSE,serviceProviderDO.isDoSignResponse() ? "true":"false");
-        pairMap.put(DO_SINGLE_LOGOUT,serviceProviderDO.isDoSingleLogout() ? "true":"false");
-        pairMap.put(DO_FRONT_CHANNEL_LOGOUT,serviceProviderDO.isDoFrontChannelLogout() ? "true":"false");
-        pairMap.put(FRONT_CHANNEL_LOGOUT_BINDING,serviceProviderDO.getFrontChannelLogoutBinding());
-        pairMap.put(IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED,serviceProviderDO.isAssertionQueryRequestProfileEnabled() ? "true":"false");
-        pairMap.put(SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES,serviceProviderDO.getSupportedAssertionQueryRequestTypes());
-        pairMap.put(ENABLE_SAML2_ARTIFACT_BINDING,serviceProviderDO.isEnableSAML2ArtifactBinding() ? "true":"false");
-        pairMap.put(DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE,serviceProviderDO.isDoValidateSignatureInArtifactResolve() ? "true":"false");
-        pairMap.put(LOGIN_PAGE_URL,serviceProviderDO.getLoginPageURL());
-        pairMap.put(SLO_RESPONSE_URL,serviceProviderDO.getSloResponseURL());
-        pairMap.put(SLO_REQUEST_URL,serviceProviderDO.getSloRequestURL());
-        for(String claim : serviceProviderDO.getRequestedClaims()){
-            pairMap.put(REQUESTED_CLAIMS,claim);
+        pairMap.put(DEFAULT_ASSERTION_CONSUMER_URL, serviceProviderDO.getDefaultAssertionConsumerUrl());
+        pairMap.put(SIGNING_ALGORITHM_URI, serviceProviderDO.getSigningAlgorithmUri());
+        pairMap.put(DIGEST_ALGORITHM_URI, serviceProviderDO.getDigestAlgorithmUri());
+        pairMap.put(ASSERTION_ENCRYPTION_ALGORITHM_URI, serviceProviderDO.getAssertionEncryptionAlgorithmUri());
+        pairMap.put(KEY_ENCRYPTION_ALGORITHM_URI, serviceProviderDO.getKeyEncryptionAlgorithmUri());
+        pairMap.put(CERT_ALIAS, serviceProviderDO.getCertAlias());
+        pairMap.put(ATTRIBUTE_CONSUMING_SERVICE_INDEX, serviceProviderDO.getAttributeConsumingServiceIndex());
+        pairMap.put(DO_SIGN_RESPONSE, serviceProviderDO.isDoSignResponse() ? "true" : "false");
+        pairMap.put(DO_SINGLE_LOGOUT, serviceProviderDO.isDoSingleLogout() ? "true" : "false");
+        pairMap.put(DO_FRONT_CHANNEL_LOGOUT, serviceProviderDO.isDoFrontChannelLogout() ? "true" : "false");
+        pairMap.put(FRONT_CHANNEL_LOGOUT_BINDING, serviceProviderDO.getFrontChannelLogoutBinding());
+        pairMap.put(IS_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED, serviceProviderDO.isAssertionQueryRequestProfileEnabled() ? "true" : "false");
+        pairMap.put(SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES, serviceProviderDO.getSupportedAssertionQueryRequestTypes());
+        pairMap.put(ENABLE_SAML2_ARTIFACT_BINDING, serviceProviderDO.isEnableSAML2ArtifactBinding() ? "true" : "false");
+        pairMap.put(DO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE, serviceProviderDO.isDoValidateSignatureInArtifactResolve() ? "true" : "false");
+        pairMap.put(LOGIN_PAGE_URL, serviceProviderDO.getLoginPageURL());
+        pairMap.put(SLO_RESPONSE_URL, serviceProviderDO.getSloResponseURL());
+        pairMap.put(SLO_REQUEST_URL, serviceProviderDO.getSloRequestURL());
+        for (String claim : serviceProviderDO.getRequestedClaims()) {
+            pairMap.put(REQUESTED_CLAIMS, claim);
         }
-        for(String audience : serviceProviderDO.getRequestedAudiences()){
-            pairMap.put(REQUESTED_AUDIENCES,audience);
+        for (String audience : serviceProviderDO.getRequestedAudiences()) {
+            pairMap.put(REQUESTED_AUDIENCES, audience);
         }
-        for(String recipient : serviceProviderDO.getRequestedRecipients()){
-            pairMap.put(REQUESTED_RECIPIENTS,recipient);
+        for (String recipient : serviceProviderDO.getRequestedRecipients()) {
+            pairMap.put(REQUESTED_RECIPIENTS, recipient);
         }
-        pairMap.put(ENABLE_ATTRIBUTES_BY_DEFAULT,serviceProviderDO.isEnableAttributesByDefault() ? "true":"false");
-        pairMap.put(NAME_ID_CLAIM_URI,serviceProviderDO.getNameIdClaimUri());
-        pairMap.put(NAME_ID_FORMAT,serviceProviderDO.getNameIDFormat());
-        pairMap.put(IDP_INIT_SSO_ENABLED,serviceProviderDO.isIdPInitSSOEnabled()?"true":"false");
-        pairMap.put(IDP_INIT_SLO_ENABLED,serviceProviderDO.isIdPInitSLOEnabled()?"true":"false");
-        for(String url : serviceProviderDO.getIdpInitSLOReturnToURLs()){
-            pairMap.put(IDP_INIT_SLO_RETURN_TO_URLS,url);
+        pairMap.put(ENABLE_ATTRIBUTES_BY_DEFAULT, serviceProviderDO.isEnableAttributesByDefault() ? "true" : "false");
+        pairMap.put(NAME_ID_CLAIM_URI, serviceProviderDO.getNameIdClaimUri());
+        pairMap.put(NAME_ID_FORMAT, serviceProviderDO.getNameIDFormat());
+        pairMap.put(IDP_INIT_SSO_ENABLED, serviceProviderDO.isIdPInitSSOEnabled() ? "true" : "false");
+        pairMap.put(IDP_INIT_SLO_ENABLED, serviceProviderDO.isIdPInitSLOEnabled() ? "true" : "false");
+        for (String url : serviceProviderDO.getIdpInitSLOReturnToURLs()) {
+            pairMap.put(IDP_INIT_SLO_RETURN_TO_URLS, url);
         }
-        pairMap.put(DO_ENABLE_ENCRYPTED_ASSERTION,serviceProviderDO.isDoEnableEncryptedAssertion()?"true":"false");
-        pairMap.put(DO_VALIDATE_SIGNATURE_IN_REQUESTS,serviceProviderDO.isDoValidateSignatureInRequests()?"true":"false");
+        pairMap.put(DO_ENABLE_ENCRYPTED_ASSERTION, serviceProviderDO.isDoEnableEncryptedAssertion() ? "true" : "false");
+        pairMap.put(DO_VALIDATE_SIGNATURE_IN_REQUESTS, serviceProviderDO.isDoValidateSignatureInRequests() ? "true" : "false");
 
-        pairMap.put(IDP_ENTITY_ID_ALIAS,serviceProviderDO.getIdpEntityIDAlias());
+        pairMap.put(IDP_ENTITY_ID_ALIAS, serviceProviderDO.getIdpEntityIDAlias());
         return pairMap;
     }
 
-    private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, String key,String value) {
-        switch (key){
+    private SAMLSSOServiceProviderDO updateServiceProviderDO(SAMLSSOServiceProviderDO samlssoServiceProviderDO, String key, String value) {
+        switch (key) {
             case ISSUER:
                 samlssoServiceProviderDO.setIssuer(value);
                 break;
@@ -1070,10 +1079,9 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                 samlssoServiceProviderDO.setDoValidateSignatureInArtifactResolve(value.equals("true"));
                 break;
             case LOGIN_PAGE_URL:
-                if(value == null || value.equals("null")){
+                if (value == null || value.equals("null")) {
                     samlssoServiceProviderDO.setLoginPageURL("");
-                }
-                else{
+                } else {
                     samlssoServiceProviderDO.setLoginPageURL(value);
                 }
                 break;
