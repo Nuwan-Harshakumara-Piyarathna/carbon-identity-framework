@@ -31,22 +31,24 @@ import org.wso2.carbon.identity.core.IdentityRegistryResources;
 import org.wso2.carbon.identity.core.KeyStoreCertificateRetriever;
 import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
-import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
-import org.wso2.carbon.registry.core.Collection;
 import org.wso2.carbon.registry.core.Registry;
 import org.wso2.carbon.registry.core.Resource;
 import org.wso2.carbon.registry.core.exceptions.RegistryException;
 import org.wso2.carbon.registry.core.jdbc.utils.Transaction;
 import org.wso2.carbon.registry.core.session.UserRegistry;
 import org.wso2.carbon.user.api.Tenant;
-import org.wso2.carbon.user.api.UserStoreException;
 
 import java.security.cert.X509Certificate;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 
 import static org.wso2.carbon.identity.core.util.JdbcUtils.isH2DB;
 
@@ -295,69 +297,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
      * @throws IdentityException Error while persisting to the registry.
      */
     public boolean addServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws IdentityException {
-        if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null ||
-                StringUtils.isBlank(serviceProviderDO.getIssuer())) {
-            throw new IdentityException("Issuer cannot be found in the provided arguments.");
-        }
-
-        // If an issuer qualifier value is specified, it is appended to the end of the issuer value.
-        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-            serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
-                    serviceProviderDO.getIssuerQualifier()));
-        }
-
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(serviceProviderDO.getIssuer());
-
-        boolean isTransactionStarted = Transaction.isStarted();
-        boolean isErrorOccurred = false;
-        try {
-            if (registry.resourceExists(path)) {
-                if (log.isDebugEnabled()) {
-                    if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
-                                + serviceProviderDO.getIssuerQualifier());
-                    } else {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + serviceProviderDO.getIssuer());
-                    }
-                }
-                return false;
-            }
-
-            Resource resource = createResource(serviceProviderDO);
-            if (!isTransactionStarted) {
-                registry.beginTransaction();
-            }
-            registry.put(path, resource);
-            if (log.isDebugEnabled()) {
-                if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " with issuer "
-                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier " +
-                            serviceProviderDO.getIssuerQualifier() + " is added successfully.");
-                } else {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " is added successfully.");
-                }
-            }
-            return true;
-        } catch (RegistryException e) {
-            isErrorOccurred = true;
-            String msg;
-            if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                msg = "Error while adding SAML2 Service Provider for issuer: " + getIssuerWithoutQualifier
-                        (serviceProviderDO.getIssuer()) + " and qualifier name " + serviceProviderDO
-                        .getIssuerQualifier();
-            } else {
-                msg = "Error while adding SAML2 Service Provider for issuer: " + serviceProviderDO.getIssuer();
-            }
-            log.error(msg, e);
-            throw IdentityException.error(msg, e);
-        } finally {
-            commitOrRollbackTransaction(isErrorOccurred);
-        }
-    }
-
-    public boolean addServiceProvider_new(SAMLSSOServiceProviderDO serviceProviderDO) throws IdentityException {
 
         if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null ||
                 StringUtils.isBlank(serviceProviderDO.getIssuer())) {
@@ -370,7 +309,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                     serviceProviderDO.getIssuerQualifier()));
         }
 
-        if (isServiceProviderExists_new(serviceProviderDO.getIssuer())) {
+        if (isServiceProviderExists(serviceProviderDO.getIssuer())) {
             if (log.isDebugEnabled()) {
                 if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
                     log.debug("SAML2 Service Provider already exists with the same issuer name "
@@ -384,7 +323,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             return false;
         }
 
-        HashMap<String, HashSet<String>> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
+        HashMap<String, LinkedHashSet<String>> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
         String issuerName = serviceProviderDO.getIssuer();
 
         Connection connection = IdentityDatabaseUtil.getDBConnection(true);
@@ -395,7 +334,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.ADD_SAML_APP);
             prepStmt.setString(1, issuerName);
             prepStmt.setInt(4, this.tenantId);
-            for (Map.Entry<String, HashSet<String>> entry : pairMap.entrySet()) {
+            for (Map.Entry<String, LinkedHashSet<String>> entry : pairMap.entrySet()) {
                 for (String value : entry.getValue()) {
                     prepStmt.setString(2, entry.getKey());
                     prepStmt.setString(3, value);
@@ -574,27 +513,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public SAMLSSOServiceProviderDO[] getServiceProviders() throws IdentityException {
-        List<SAMLSSOServiceProviderDO> serviceProvidersList = new ArrayList<>();
-        try {
-            if (registry.resourceExists(IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS)) {
-                Resource samlSSOServiceProvidersResource = registry.get(IdentityRegistryResources
-                        .SAML_SSO_SERVICE_PROVIDERS);
-                if (samlSSOServiceProvidersResource instanceof Collection) {
-                    Collection samlSSOServiceProvidersCollection = (Collection) samlSSOServiceProvidersResource;
-                    String[] resources = samlSSOServiceProvidersCollection.getChildren();
-                    for (String resource : resources) {
-                        getChildResources(resource, serviceProvidersList);
-                    }
-                }
-            }
-        } catch (RegistryException e) {
-            log.error("Error reading Service Providers from Registry", e);
-            throw IdentityException.error("Error reading Service Providers from Registry", e);
-        }
-        return serviceProvidersList.toArray(new SAMLSSOServiceProviderDO[serviceProvidersList.size()]);
-    }
-
-    public SAMLSSOServiceProviderDO[] getServiceProviders_new() throws IdentityException {
 
         HashMap<String, SAMLSSOServiceProviderDO> serviceProvidersMap = new HashMap<>();
         PreparedStatement prepStmt = null;
@@ -616,7 +534,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                         results.getString(2), results.getString(3)));
             }
         } catch (SQLException e) {
-            String msg = "Error getting all service providers from the database : ";
+            String msg = "Error getting all service providers from the database.";
             throw new IdentityException(msg, e);
         } finally {
             IdentityDatabaseUtil.closeAllConnections(connection, results, prepStmt);
@@ -636,41 +554,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         if (issuer == null || StringUtils.isEmpty(issuer.trim())) {
             throw new IllegalArgumentException("Trying to delete issuer \'" + issuer + "\'");
         }
-
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(issuer);
-        boolean isTransactionStarted = Transaction.isStarted();
-        boolean isErrorOccurred = false;
-        try {
-            if (!registry.resourceExists(path)) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Registry resource does not exist for the path: " + path);
-                }
-                return false;
-            }
-
-            // Since we are getting a global registry object, better to check whether this is a task inside already
-            // started transaction.
-            if (!isTransactionStarted) {
-                registry.beginTransaction();
-            }
-            registry.delete(path);
-            return true;
-        } catch (RegistryException e) {
-            isErrorOccurred = true;
-            String msg = "Error removing the service provider from the registry with name: " + issuer;
-            log.error(msg, e);
-            throw IdentityException.error(msg, e);
-        } finally {
-            commitOrRollbackTransaction(isErrorOccurred);
-        }
-    }
-
-    public boolean removeServiceProvider_new(String issuer) throws IdentityException {
-
-        if (issuer == null || StringUtils.isEmpty(issuer.trim())) {
-            throw new IllegalArgumentException("Trying to delete issuer \'" + issuer + "\'");
-        }
-        if (!isServiceProviderExists_new(issuer)) {
+        if (!isServiceProviderExists(issuer)) {
             if (log.isDebugEnabled()) {
                 log.debug("SAMLSSO Service provider does not exist for the issuer name : " + issuer);
             }
@@ -695,57 +579,10 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return true;
     }
 
-    /**
-     * Get the service provider.
-     *
-     * @param issuer
-     * @return
-     * @throws IdentityException
-     */
+
     public SAMLSSOServiceProviderDO getServiceProvider(String issuer) throws IdentityException {
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(issuer);
-        SAMLSSOServiceProviderDO serviceProviderDO = null;
 
-        UserRegistry userRegistry = null;
-        String tenantDomain = null;
-        try {
-            userRegistry = (UserRegistry) registry;
-            tenantDomain = IdentityTenantUtil.getRealmService().getTenantManager().getDomain(userRegistry.
-                    getTenantId());
-            if (registry.resourceExists(path)) {
-                serviceProviderDO = resourceToObject(registry.get(path));
-
-                // Load the certificate stored in the database, if signature validation is enabled..
-                if (serviceProviderDO.isDoValidateSignatureInRequests() ||
-                        serviceProviderDO.isDoValidateSignatureInArtifactResolve() ||
-                        serviceProviderDO.isDoEnableEncryptedAssertion()) {
-                    Tenant tenant = new Tenant();
-                    tenant.setDomain(tenantDomain);
-                    tenant.setId(userRegistry.getTenantId());
-
-                    serviceProviderDO.setX509Certificate(getApplicationCertificate(serviceProviderDO, tenant));
-                }
-                serviceProviderDO.setTenantDomain(tenantDomain);
-            }
-        } catch (RegistryException e) {
-            throw IdentityException.error("Error occurred while checking if resource path \'" + path + "\' exists in " +
-                    "registry for tenant domain : " + tenantDomain, e);
-        } catch (UserStoreException e) {
-            throw IdentityException.error("Error occurred while getting tenant domain from tenant ID : " +
-                    userRegistry.getTenantId(), e);
-        } catch (SQLException e) {
-            throw IdentityException.error(String.format("An error occurred while getting the " +
-                    "application certificate id for validating the requests from the issuer '%s'", issuer), e);
-        } catch (CertificateRetrievingException e) {
-            throw IdentityException.error(String.format("An error occurred while getting the " +
-                    "application certificate for validating the requests from the issuer '%s'", issuer), e);
-        }
-        return serviceProviderDO;
-    }
-
-    public SAMLSSOServiceProviderDO getServiceProvider_new(String issuer) throws IdentityException {
-
-        if (!isServiceProviderExists_new(issuer)) {
+        if (!isServiceProviderExists(issuer)) {
             if (log.isDebugEnabled()) {
                 log.debug("SAMLSSO Service provider does not exist for the issuer name : " + issuer);
             }
@@ -836,16 +673,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     }
 
     public boolean isServiceProviderExists(String issuer) throws IdentityException {
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(issuer);
-        try {
-            return registry.resourceExists(path);
-        } catch (RegistryException e) {
-            throw IdentityException.error("Error occurred while checking if resource path \'" + path + "\' exists in " +
-                    "registry");
-        }
-    }
-
-    public boolean isServiceProviderExists_new(String issuer) throws IdentityException {
 
         PreparedStatement prepStmt = null;
         ResultSet results = null;
@@ -961,32 +788,9 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         }
     }
 
-    /**
-     * This helps to find resources in a recursive manner.
-     *
-     * @param parentResource      parent resource Name.
-     * @param serviceProviderList child resource list.
-     * @throws RegistryException
-     */
-    private void getChildResources(String parentResource, List<SAMLSSOServiceProviderDO>
-            serviceProviderList) throws RegistryException {
-
-        if (registry.resourceExists(parentResource)) {
-            Resource resource = registry.get(parentResource);
-            if (resource instanceof Collection) {
-                Collection collection = (Collection) resource;
-                String[] resources = collection.getChildren();
-                for (String res : resources) {
-                    getChildResources(res, serviceProviderList);
-                }
-            } else {
-                serviceProviderList.add(resourceToObject(resource));
-            }
-        }
-    }
-
-    private HashMap<String, HashSet<String>> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO serviceProviderDO) {
-        HashMap<String, HashSet<String>> pairMap = new HashMap<>();
+    private HashMap<String, LinkedHashSet<String>> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO
+                                                                                         serviceProviderDO) {
+        HashMap<String, LinkedHashSet<String>> pairMap = new HashMap<>();
         addKeyValuePair(pairMap, ISSUER, serviceProviderDO.getIssuer());
         addKeyValuePair(pairMap, ISSUER_QUALIFIER, serviceProviderDO.getIssuerQualifier());
         for (String url : serviceProviderDO.getAssertionConsumerUrls()) {
@@ -1043,12 +847,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return pairMap;
     }
 
-    private void addKeyValuePair(HashMap<String, HashSet<String>> map, String key, String value) {
-        HashSet<String> values;
+    private void addKeyValuePair(HashMap<String, LinkedHashSet<String>> map, String key, String value) {
+        LinkedHashSet<String> values;
         if (map.containsKey(key)) {
             values = map.get(key);
         } else {
-            values = new HashSet<>();
+            values = new LinkedHashSet<>();
         }
         values.add(value);
         map.put(key, values);
