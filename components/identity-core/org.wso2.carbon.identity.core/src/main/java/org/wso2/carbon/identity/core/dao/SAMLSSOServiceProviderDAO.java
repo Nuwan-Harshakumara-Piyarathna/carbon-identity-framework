@@ -779,47 +779,51 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                     serviceProviderDO.getIssuer());
         }
 
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(serviceProviderDO.getIssuer());
-
-        boolean isTransactionStarted = Transaction.isStarted();
-        boolean isErrorOccurred = false;
-        try {
-            if (registry.resourceExists(path)) {
-                if (log.isDebugEnabled()) {
-                    if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
-                                + serviceProviderDO.getIssuerQualifier());
-                    } else {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + serviceProviderDO.getIssuer());
-                    }
-                }
-                throw IdentityException.error("A Service Provider already exists.");
-            }
-
-            if (!isTransactionStarted) {
-                registry.beginTransaction();
-            }
-
-            Resource resource = createResource(serviceProviderDO);
-            registry.put(path, resource);
+        if (isServiceProviderExists(serviceProviderDO.getIssuer())) {
             if (log.isDebugEnabled()) {
                 if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " with issuer "
-                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier " +
-                            serviceProviderDO.getIssuerQualifier() + " is added successfully.");
+                    log.debug("SAML2 Service Provider already exists with the same issuer name "
+                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
+                            + serviceProviderDO.getIssuerQualifier());
                 } else {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " is added successfully.");
+                    log.debug("SAML2 Service Provider already exists with the same issuer name "
+                            + serviceProviderDO.getIssuer());
                 }
             }
-            return serviceProviderDO;
-        } catch (RegistryException e) {
-            isErrorOccurred = true;
-            throw IdentityException.error("Error while adding Service Provider.", e);
-        } finally {
-            commitOrRollbackTransaction(isErrorOccurred);
+            throw IdentityException.error("A Service Provider already exists.");
         }
+
+        HashMap<String, LinkedHashSet<String>> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
+        String issuerName = serviceProviderDO.getIssuer();
+
+        Connection connection = IdentityDatabaseUtil.getDBConnection(true);
+
+        PreparedStatement prepStmt = null;
+
+        try {
+            prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.ADD_SAML_APP);
+            prepStmt.setString(1, issuerName);
+            prepStmt.setInt(4, this.tenantId);
+            for (Map.Entry<String, LinkedHashSet<String>> entry : pairMap.entrySet()) {
+                for (String value : entry.getValue()) {
+                    prepStmt.setString(2, entry.getKey());
+                    prepStmt.setString(3, value);
+                    prepStmt.addBatch();
+                }
+            }
+            prepStmt.executeBatch();
+            IdentityDatabaseUtil.commitTransaction(connection);
+        } catch (SQLException e) {
+            IdentityDatabaseUtil.rollbackTransaction(connection);
+            String msg = "Error adding new service provider to the database with issuer" +
+                    serviceProviderDO.getIssuer();
+            log.error(msg, e);
+            throw new IdentityException(msg, e);
+        } finally {
+            IdentityDatabaseUtil.closeAllConnections(connection, null, prepStmt);
+        }
+        return serviceProviderDO;
+
     }
 
     /**
