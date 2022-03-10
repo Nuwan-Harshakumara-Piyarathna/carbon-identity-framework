@@ -233,9 +233,17 @@ public class IdentityPersistenceManager {
      * @return
      * @throws IdentityException
      */
+
+    @Deprecated
     public boolean addServiceProvider(Registry registry, SAMLSSOServiceProviderDO serviceProviderDO)
             throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
+        return serviceProviderDAO.addServiceProvider(serviceProviderDO);
+    }
+
+    public boolean addServiceProvider(int tenantId, SAMLSSOServiceProviderDO serviceProviderDO)
+            throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(tenantId);
         return serviceProviderDAO.addServiceProvider(serviceProviderDO);
     }
 
@@ -246,8 +254,14 @@ public class IdentityPersistenceManager {
      * @return
      * @throws IdentityException
      */
+    @Deprecated
     public SAMLSSOServiceProviderDO uploadServiceProvider(Registry registry, SAMLSSOServiceProviderDO samlssoServiceProviderDO) throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
+        return serviceProviderDAO.uploadServiceProvider(samlssoServiceProviderDO);
+    }
+
+    public SAMLSSOServiceProviderDO uploadServiceProvider(int tenantId, SAMLSSOServiceProviderDO samlssoServiceProviderDO) throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(tenantId);
         return serviceProviderDAO.uploadServiceProvider(samlssoServiceProviderDO);
     }
 
@@ -257,25 +271,51 @@ public class IdentityPersistenceManager {
      * @return
      * @throws IdentityException
      */
+    @Deprecated
     public SAMLSSOServiceProviderDO[] getServiceProviders(Registry registry)
             throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDOA = new SAMLSSOServiceProviderDAO(registry);
         return serviceProviderDOA.getServiceProviders();
     }
 
+    public SAMLSSOServiceProviderDO[] getServiceProviders(int tenantId)
+            throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDOA = new SAMLSSOServiceProviderDAO(tenantId);
+        return serviceProviderDOA.getServiceProviders();
+    }
+
+    @Deprecated
     public boolean removeServiceProvider(Registry registry, String issuer) throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
         return serviceProviderDAO.removeServiceProvider(issuer);
     }
 
+    public boolean removeServiceProvider(int tenantId, String issuer) throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(tenantId);
+        return serviceProviderDAO.removeServiceProvider(issuer);
+    }
+
+    @Deprecated
     public SAMLSSOServiceProviderDO getServiceProvider(Registry registry, String issuer)
             throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
         return serviceProviderDAO.getServiceProvider(issuer);
     }
 
+    public SAMLSSOServiceProviderDO getServiceProvider(int tenantId, String issuer)
+            throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(tenantId);
+        return serviceProviderDAO.getServiceProvider(issuer);
+    }
+
+    @Deprecated
     public boolean isServiceProviderExists(Registry registry, String issuer) throws IdentityException {
         SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(registry);
+        return serviceProviderDAO.isServiceProviderExists(issuer);
+    }
+
+    public boolean isServiceProviderExists(int tenantId, String issuer) throws IdentityException {
+        SAMLSSOServiceProviderDAO serviceProviderDAO = new SAMLSSOServiceProviderDAO(tenantId);
         return serviceProviderDAO.isServiceProviderExists(issuer);
     }
 

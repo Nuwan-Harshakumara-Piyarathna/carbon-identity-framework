@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2005-2007 WSO2, Inc. (http://wso2.com)
  *
@@ -16,8 +17,6 @@
 
 package org.wso2.carbon.identity.core.dao;
 
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,9 +31,6 @@ import org.wso2.carbon.identity.core.KeyStoreCertificateRetriever;
 import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
 import org.wso2.carbon.registry.core.Registry;
-import org.wso2.carbon.registry.core.Resource;
-import org.wso2.carbon.registry.core.exceptions.RegistryException;
-import org.wso2.carbon.registry.core.jdbc.utils.Transaction;
 import org.wso2.carbon.registry.core.session.UserRegistry;
 import org.wso2.carbon.user.api.Tenant;
 
@@ -55,7 +51,7 @@ import static org.wso2.carbon.identity.core.util.JdbcUtils.isH2DB;
 /**
  * DAO for SAMLSSO Service Provider database operations.
  */
-public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProviderDO> {
+public class SAMLSSOServiceProviderDAO {
 
     private static final String CERTIFICATE_PROPERTY_NAME = "CERTIFICATE";
     private static final String QUERY_TO_GET_APPLICATION_CERTIFICATE_ID = "SELECT " +
@@ -109,184 +105,8 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         this.tenantId = userRegistry.getTenantId();
     }
 
-    protected SAMLSSOServiceProviderDO resourceToObject(Resource resource) {
-        SAMLSSOServiceProviderDO serviceProviderDO = new SAMLSSOServiceProviderDO();
-        serviceProviderDO.setIssuer(resource
-                .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER));
-        serviceProviderDO.setAssertionConsumerUrls(resource.getPropertyValues(
-                IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_CONS_URLS));
-        serviceProviderDO.setDefaultAssertionConsumerUrl(resource.getProperty(
-                IdentityRegistryResources.PROP_DEFAULT_SAML_SSO_ASSERTION_CONS_URL));
-        serviceProviderDO.setCertAlias(resource
-                .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER_CERT_ALIAS));
-
-        if (StringUtils.isNotEmpty(resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_SIGNING_ALGORITHM))) {
-            serviceProviderDO.setSigningAlgorithmUri(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SSO_SIGNING_ALGORITHM));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED) !=
-                null) {
-            serviceProviderDO.setAssertionQueryRequestProfileEnabled(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED).trim()));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES) !=
-                null) {
-            serviceProviderDO.setSupportedAssertionQueryRequestTypes(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES).trim());
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_SAML2_ARTIFACT_BINDING) !=
-                null) {
-            serviceProviderDO.setEnableSAML2ArtifactBinding(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ENABLE_SAML2_ARTIFACT_BINDING).trim()));
-        }
-
-        if (StringUtils.isNotEmpty(resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_DIGEST_ALGORITHM))) {
-            serviceProviderDO.setDigestAlgorithmUri(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SSO_DIGEST_ALGORITHM));
-        }
-
-        if (StringUtils.isNotEmpty(resource.getProperty(IdentityRegistryResources
-                .PROP_SAML_SSO_ASSERTION_ENCRYPTION_ALGORITHM))) {
-            serviceProviderDO.setAssertionEncryptionAlgorithmUri(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SSO_ASSERTION_ENCRYPTION_ALGORITHM));
-        }
-
-        if (StringUtils.isNotEmpty(resource.getProperty(IdentityRegistryResources
-                .PROP_SAML_SSO_KEY_ENCRYPTION_ALGORITHM))) {
-            serviceProviderDO.setKeyEncryptionAlgorithmUri(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SSO_KEY_ENCRYPTION_ALGORITHM));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SINGLE_LOGOUT) != null) {
-            serviceProviderDO.setDoSingleLogout(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_DO_SINGLE_LOGOUT).trim()));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_NAMEID_FORMAT) != null) {
-            serviceProviderDO.setNameIDFormat(resource.
-                    getProperty(IdentityRegistryResources.PROP_SAML_SSO_NAMEID_FORMAT));
-        }
-
-        if (resource
-                .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_NAMEID_CLAIMURI) != null) {
-            if (Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ENABLE_NAMEID_CLAIMURI).trim())) {
-                serviceProviderDO.setNameIdClaimUri(resource.
-                        getProperty(IdentityRegistryResources.PROP_SAML_SSO_NAMEID_CLAIMURI));
-            }
-        }
-
-        serviceProviderDO.setLoginPageURL(resource.
-                getProperty(IdentityRegistryResources.PROP_SAML_SSO_LOGIN_PAGE_URL));
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_RESPONSE) != null) {
-            serviceProviderDO.setDoSignResponse(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_RESPONSE).trim()));
-        }
-
-        if (serviceProviderDO.isDoSingleLogout()) {
-            serviceProviderDO.setSloResponseURL(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SLO_RESPONSE_URL));
-            serviceProviderDO.setSloRequestURL(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SLO_REQUEST_URL));
-            // Check front channel logout enable.
-            if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_FRONT_CHANNEL_LOGOUT) != null) {
-                serviceProviderDO.setDoFrontChannelLogout(Boolean.valueOf(resource.getProperty(
-                        IdentityRegistryResources.PROP_SAML_SSO_DO_FRONT_CHANNEL_LOGOUT).trim()));
-                if (serviceProviderDO.isDoFrontChannelLogout()) {
-                    if (resource.getProperty(IdentityRegistryResources.
-                            PROP_SAML_SSO_FRONT_CHANNEL_LOGOUT_BINDING) != null) {
-                        serviceProviderDO.setFrontChannelLogoutBinding(resource.getProperty(
-                                IdentityRegistryResources.PROP_SAML_SSO_FRONT_CHANNEL_LOGOUT_BINDING));
-                    } else {
-                        // Default is redirect-binding.
-                        serviceProviderDO.setFrontChannelLogoutBinding(IdentityRegistryResources
-                                .DEFAULT_FRONT_CHANNEL_LOGOUT_BINDING);
-                    }
-
-                }
-            }
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_ASSERTIONS) != null) {
-            serviceProviderDO.setDoSignAssertions(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_ASSERTIONS).trim()));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_ENABLE_ECP) != null) {
-            serviceProviderDO.setSamlECP(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_ENABLE_ECP).trim()));
-        }
-
-        if (resource
-                .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ATTRIB_CONSUMING_SERVICE_INDEX) != null) {
-            serviceProviderDO
-                    .setAttributeConsumingServiceIndex(resource
-                            .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ATTRIB_CONSUMING_SERVICE_INDEX));
-        } else {
-            // Specific DB's (like oracle) returns empty strings as null.
-            serviceProviderDO.setAttributeConsumingServiceIndex("");
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_CLAIMS) != null) {
-            serviceProviderDO.setRequestedClaims(resource
-                    .getPropertyValues(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_CLAIMS));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_AUDIENCES) != null) {
-            serviceProviderDO.setRequestedAudiences(resource
-                    .getPropertyValues(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_AUDIENCES));
-        }
-
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_RECIPIENTS) != null) {
-            serviceProviderDO.setRequestedRecipients(resource
-                    .getPropertyValues(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_RECIPIENTS));
-        }
-
-        if (resource
-                .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ATTRIBUTES_BY_DEFAULT) != null) {
-            String enableAttrByDefault = resource
-                    .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ATTRIBUTES_BY_DEFAULT);
-            serviceProviderDO.setEnableAttributesByDefault(Boolean.valueOf(enableAttrByDefault));
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_IDP_INIT_SSO_ENABLED) != null) {
-            serviceProviderDO.setIdPInitSSOEnabled(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_IDP_INIT_SSO_ENABLED).trim()));
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SLO_IDP_INIT_SLO_ENABLED) != null) {
-            serviceProviderDO.setIdPInitSLOEnabled(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SLO_IDP_INIT_SLO_ENABLED).trim()));
-            if (serviceProviderDO.isIdPInitSLOEnabled() && resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_IDP_INIT_SLO_RETURN_URLS) != null) {
-                serviceProviderDO.setIdpInitSLOReturnToURLs(resource.getPropertyValues(
-                        IdentityRegistryResources.PROP_SAML_IDP_INIT_SLO_RETURN_URLS));
-            }
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ENCRYPTED_ASSERTION) != null) {
-            serviceProviderDO.setDoEnableEncryptedAssertion(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ENCRYPTED_ASSERTION).trim()));
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_REQUESTS) != null) {
-            serviceProviderDO.setDoValidateSignatureInRequests(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_REQUESTS).trim()));
-        }
-        if (resource.getProperty(
-                IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE) != null) {
-            serviceProviderDO.setDoValidateSignatureInArtifactResolve(Boolean.valueOf(resource.getProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE).trim()));
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER_QUALIFIER) != null) {
-            serviceProviderDO.setIssuerQualifier(resource
-                    .getProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER_QUALIFIER));
-        }
-        if (resource.getProperty(IdentityRegistryResources.PROP_SAML_SSO_IDP_ENTITY_ID_ALIAS) != null) {
-            serviceProviderDO.setIdpEntityIDAlias(resource.getProperty(IdentityRegistryResources
-                    .PROP_SAML_SSO_IDP_ENTITY_ID_ALIAS));
-        }
-        return serviceProviderDO;
+    public SAMLSSOServiceProviderDAO(int tenantId) {
+        this.tenantId = tenantId;
     }
 
     /**
@@ -355,137 +175,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         return true;
     }
 
-    private Resource createResource(SAMLSSOServiceProviderDO serviceProviderDO) throws RegistryException {
-        Resource resource;
-        resource = registry.newResource();
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER,
-                serviceProviderDO.getIssuer());
-        resource.setProperty(IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_CONS_URLS,
-                serviceProviderDO.getAssertionConsumerUrlList());
-        resource.addProperty(IdentityRegistryResources.PROP_DEFAULT_SAML_SSO_ASSERTION_CONS_URL,
-                serviceProviderDO.getDefaultAssertionConsumerUrl());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER_CERT_ALIAS,
-                serviceProviderDO.getCertAlias());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_LOGIN_PAGE_URL,
-                serviceProviderDO.getLoginPageURL());
-        resource.addProperty(
-                IdentityRegistryResources.PROP_SAML_SSO_NAMEID_FORMAT,
-                serviceProviderDO.getNameIDFormat());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_SIGNING_ALGORITHM, serviceProviderDO
-                .getSigningAlgorithmUri());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_DIGEST_ALGORITHM, serviceProviderDO
-                .getDigestAlgorithmUri());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_ENCRYPTION_ALGORITHM, serviceProviderDO
-                .getAssertionEncryptionAlgorithmUri());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_KEY_ENCRYPTION_ALGORITHM, serviceProviderDO
-                .getKeyEncryptionAlgorithmUri());
-        if (serviceProviderDO.getNameIdClaimUri() != null
-                && serviceProviderDO.getNameIdClaimUri().trim().length() > 0) {
-            resource.addProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ENABLE_NAMEID_CLAIMURI,
-                    "true");
-            resource.addProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_NAMEID_CLAIMURI,
-                    serviceProviderDO.getNameIdClaimUri());
-        } else {
-            resource.addProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ENABLE_NAMEID_CLAIMURI,
-                    "false");
-        }
-
-        String doSingleLogout = String.valueOf(serviceProviderDO.isDoSingleLogout());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SINGLE_LOGOUT, doSingleLogout);
-        if (serviceProviderDO.isDoSingleLogout()) {
-            if (StringUtils.isNotBlank(serviceProviderDO.getSloResponseURL())) {
-                resource.addProperty(IdentityRegistryResources.PROP_SAML_SLO_RESPONSE_URL,
-                        serviceProviderDO.getSloResponseURL());
-            }
-            if (StringUtils.isNotBlank(serviceProviderDO.getSloRequestURL())) {
-                resource.addProperty(IdentityRegistryResources.PROP_SAML_SLO_REQUEST_URL,
-                        serviceProviderDO.getSloRequestURL());
-            }
-            // Create doFrontChannelLogout property in the registry.
-            String doFrontChannelLogout = String.valueOf(serviceProviderDO.isDoFrontChannelLogout());
-            resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_FRONT_CHANNEL_LOGOUT, doFrontChannelLogout);
-            if (serviceProviderDO.isDoFrontChannelLogout()) {
-                // Create frontChannelLogoutMethod property in the registry.
-                resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_FRONT_CHANNEL_LOGOUT_BINDING,
-                        serviceProviderDO.getFrontChannelLogoutBinding());
-            }
-        }
-
-        String doSignResponse = String.valueOf(serviceProviderDO.isDoSignResponse());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_RESPONSE,
-                doSignResponse);
-        String isAssertionQueryRequestProfileEnabled = String.valueOf(serviceProviderDO
-                .isAssertionQueryRequestProfileEnabled());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ASSERTION_QUERY_REQUEST_PROFILE_ENABLED,
-                isAssertionQueryRequestProfileEnabled);
-        String supportedAssertionQueryRequestTypes = serviceProviderDO.getSupportedAssertionQueryRequestTypes();
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_SUPPORTED_ASSERTION_QUERY_REQUEST_TYPES,
-                supportedAssertionQueryRequestTypes);
-        String isEnableSAML2ArtifactBinding = String.valueOf(serviceProviderDO
-                .isEnableSAML2ArtifactBinding());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_SAML2_ARTIFACT_BINDING,
-                isEnableSAML2ArtifactBinding);
-        String doSignAssertions = String.valueOf(serviceProviderDO.isDoSignAssertions());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_DO_SIGN_ASSERTIONS,
-                doSignAssertions);
-        String isSamlECP = String.valueOf(serviceProviderDO.isSamlECP());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_ENABLE_ECP,
-                isSamlECP);
-        if (CollectionUtils.isNotEmpty(serviceProviderDO.getRequestedClaimsList())) {
-            resource.setProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_CLAIMS,
-                    serviceProviderDO.getRequestedClaimsList());
-        }
-        if (serviceProviderDO.getAttributeConsumingServiceIndex() != null) {
-            resource.addProperty(
-                    IdentityRegistryResources.PROP_SAML_SSO_ATTRIB_CONSUMING_SERVICE_INDEX,
-                    serviceProviderDO.getAttributeConsumingServiceIndex());
-        }
-        if (CollectionUtils.isNotEmpty(serviceProviderDO.getRequestedAudiencesList())) {
-            resource.setProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_AUDIENCES,
-                    serviceProviderDO.getRequestedAudiencesList());
-        }
-        if (CollectionUtils.isNotEmpty(serviceProviderDO.getRequestedRecipientsList())) {
-            resource.setProperty(IdentityRegistryResources.PROP_SAML_SSO_REQUESTED_RECIPIENTS,
-                    serviceProviderDO.getRequestedRecipientsList());
-        }
-
-        String enableAttributesByDefault = String.valueOf(serviceProviderDO.isEnableAttributesByDefault());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ATTRIBUTES_BY_DEFAULT,
-                enableAttributesByDefault);
-        String idPInitSSOEnabled = String.valueOf(serviceProviderDO.isIdPInitSSOEnabled());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_IDP_INIT_SSO_ENABLED,
-                idPInitSSOEnabled);
-        String idPInitSLOEnabled = String.valueOf(serviceProviderDO.isIdPInitSLOEnabled());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SLO_IDP_INIT_SLO_ENABLED, idPInitSLOEnabled);
-        if (serviceProviderDO.isIdPInitSLOEnabled() && serviceProviderDO.getIdpInitSLOReturnToURLList().size() > 0) {
-            resource.setProperty(IdentityRegistryResources.PROP_SAML_IDP_INIT_SLO_RETURN_URLS,
-                    serviceProviderDO.getIdpInitSLOReturnToURLList());
-        }
-        String enableEncryptedAssertion = String.valueOf(serviceProviderDO.isDoEnableEncryptedAssertion());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ENABLE_ENCRYPTED_ASSERTION,
-                enableEncryptedAssertion);
-
-        String validateSignatureInRequests = String.valueOf(serviceProviderDO.isDoValidateSignatureInRequests());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_REQUESTS,
-                validateSignatureInRequests);
-
-        String validateSignatureInArtifactResolve =
-                String.valueOf(serviceProviderDO.isDoValidateSignatureInArtifactResolve());
-        resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_VALIDATE_SIGNATURE_IN_ARTIFACT_RESOLVE,
-                validateSignatureInArtifactResolve);
-        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-            resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_ISSUER_QUALIFIER, serviceProviderDO
-                    .getIssuerQualifier());
-        }
-        if (StringUtils.isNotBlank(serviceProviderDO.getIdpEntityIDAlias())) {
-            resource.addProperty(IdentityRegistryResources.PROP_SAML_SSO_IDP_ENTITY_ID_ALIAS, serviceProviderDO
-                    .getIdpEntityIDAlias());
-        }
-        return resource;
-    }
 
     /**
      * Get the issuer value by removing the qualifier.
@@ -702,67 +391,68 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
      * @return True if upload success.
      * @throws IdentityException Error occurred while adding the information to registry.
      */
+//    public SAMLSSOServiceProviderDO uploadServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws
+//            IdentityException {
+//
+//        if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null) {
+//            throw new IdentityException("Issuer cannot be found in the provided arguments.");
+//        }
+//
+//        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
+//            serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
+//                    serviceProviderDO.getIssuerQualifier()));
+//        }
+//
+//        if (serviceProviderDO.getDefaultAssertionConsumerUrl() == null) {
+//            throw new IdentityException("No default assertion consumer URL provided for service provider :" +
+//                    serviceProviderDO.getIssuer());
+//        }
+//
+//        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS +
+//        encodePath(serviceProviderDO.getIssuer());
+//
+//        boolean isTransactionStarted = Transaction.isStarted();
+//        boolean isErrorOccurred = false;
+//        try {
+//            if (registry.resourceExists(path)) {
+//                if (log.isDebugEnabled()) {
+//                    if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
+//                        log.debug("SAML2 Service Provider already exists with the same issuer name "
+//                                + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
+//                                + serviceProviderDO.getIssuerQualifier());
+//                    } else {
+//                        log.debug("SAML2 Service Provider already exists with the same issuer name "
+//                                + serviceProviderDO.getIssuer());
+//                    }
+//                }
+//                throw IdentityException.error("A Service Provider already exists.");
+//            }
+//
+//            if (!isTransactionStarted) {
+//                registry.beginTransaction();
+//            }
+//
+//            Resource resource = createResource(serviceProviderDO);
+//            registry.put(path, resource);
+//            if (log.isDebugEnabled()) {
+//                if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
+//                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " with issuer "
+//                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier " +
+//                            serviceProviderDO.getIssuerQualifier() + " is added successfully.");
+//                } else {
+//                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " is added successfully.");
+//                }
+//            }
+//            return serviceProviderDO;
+//        } catch (RegistryException e) {
+//            isErrorOccurred = true;
+//            throw IdentityException.error("Error while adding Service Provider.", e);
+//        } finally {
+//            commitOrRollbackTransaction(isErrorOccurred);
+//        }
+//    }
+
     public SAMLSSOServiceProviderDO uploadServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws
-            IdentityException {
-
-        if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null) {
-            throw new IdentityException("Issuer cannot be found in the provided arguments.");
-        }
-
-        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-            serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
-                    serviceProviderDO.getIssuerQualifier()));
-        }
-
-        if (serviceProviderDO.getDefaultAssertionConsumerUrl() == null) {
-            throw new IdentityException("No default assertion consumer URL provided for service provider :" +
-                    serviceProviderDO.getIssuer());
-        }
-
-        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS + encodePath(serviceProviderDO.getIssuer());
-
-        boolean isTransactionStarted = Transaction.isStarted();
-        boolean isErrorOccurred = false;
-        try {
-            if (registry.resourceExists(path)) {
-                if (log.isDebugEnabled()) {
-                    if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
-                                + serviceProviderDO.getIssuerQualifier());
-                    } else {
-                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-                                + serviceProviderDO.getIssuer());
-                    }
-                }
-                throw IdentityException.error("A Service Provider already exists.");
-            }
-
-            if (!isTransactionStarted) {
-                registry.beginTransaction();
-            }
-
-            Resource resource = createResource(serviceProviderDO);
-            registry.put(path, resource);
-            if (log.isDebugEnabled()) {
-                if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " with issuer "
-                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier " +
-                            serviceProviderDO.getIssuerQualifier() + " is added successfully.");
-                } else {
-                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " is added successfully.");
-                }
-            }
-            return serviceProviderDO;
-        } catch (RegistryException e) {
-            isErrorOccurred = true;
-            throw IdentityException.error("Error while adding Service Provider.", e);
-        } finally {
-            commitOrRollbackTransaction(isErrorOccurred);
-        }
-    }
-
-    public SAMLSSOServiceProviderDO uploadServiceProvider_new(SAMLSSOServiceProviderDO serviceProviderDO) throws
             IdentityException {
 
         if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null) {
@@ -824,27 +514,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         }
         return serviceProviderDO;
 
-    }
-
-    /**
-     * Commit or rollback the registry operation depends on the error condition.
-     *
-     * @param isErrorOccurred Identifier for error transactions.
-     * @throws IdentityException Error while committing or running rollback on the transaction.
-     */
-    private void commitOrRollbackTransaction(boolean isErrorOccurred) throws IdentityException {
-
-        try {
-            // Rollback the transaction if there is an error, Otherwise try to commit.
-            if (isErrorOccurred) {
-                registry.rollbackTransaction();
-            } else {
-                registry.commitTransaction();
-            }
-        } catch (RegistryException ex) {
-            throw new IdentityException("Error occurred while trying to commit or rollback the registry operation.",
-                    ex);
-        }
     }
 
     private HashMap<String, LinkedHashSet<String>> convertServiceProviderDOToMap(SAMLSSOServiceProviderDO
