@@ -29,7 +29,6 @@ import org.wso2.carbon.identity.core.CertificateRetrievingException;
 import org.wso2.carbon.identity.core.DatabaseCertificateRetriever;
 import org.wso2.carbon.identity.core.IdentityRegistryResources;
 import org.wso2.carbon.identity.core.KeyStoreCertificateRetriever;
-import org.wso2.carbon.identity.core.model.SAMLSSOAttribute;
 import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
@@ -98,15 +97,13 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     public static final String DO_VALIDATE_SIGNATURE_IN_REQUESTS = "doValidateSignatureInRequests";
     public static final String IDP_ENTITY_ID_ALIAS = "idpEntityIDAlias";
 
-    public SAMLSSOServiceProviderDAO(Registry registry) {
-        this.registry = registry;
-    }
-
     private int tenantId;
 
-    public SAMLSSOServiceProviderDAO(int tenantId) {
-        this.tenantId = tenantId;
+    public SAMLSSOServiceProviderDAO(Registry registry) {
+        UserRegistry userRegistry = (UserRegistry) registry;
+        this.tenantId = userRegistry.getTenantId();
     }
+
 
     protected SAMLSSOServiceProviderDO resourceToObject(Resource resource) {
         SAMLSSOServiceProviderDO serviceProviderDO = new SAMLSSOServiceProviderDO();
@@ -378,7 +375,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
         HashMap<String, String> pairMap = convertServiceProviderDOToMap(serviceProviderDO);
         String issuerName = serviceProviderDO.getIssuer();
-        int tenantId = getTenantId();
 
         Connection connection = IdentityDatabaseUtil.getDBConnection(true);
 
@@ -390,7 +386,7 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
                 prepStmt.setString(1, issuerName);
                 prepStmt.setString(2, entry.getKey());
                 prepStmt.setString(3, entry.getValue());
-                prepStmt.setInt(4, tenantId);
+                prepStmt.setInt(4, this.tenantId);
                 prepStmt.addBatch();
             }
             prepStmt.executeBatch();
@@ -402,11 +398,6 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
 
 
         return true;
-    }
-
-    private int getTenantId() {
-        UserRegistry userRegistry = (UserRegistry) registry;
-        return userRegistry.getTenantId();
     }
 
     private Resource createResource(SAMLSSOServiceProviderDO serviceProviderDO) throws RegistryException {
@@ -591,11 +582,10 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         HashMap<String, SAMLSSOServiceProviderDO> serviceProvidersMap = new HashMap<>();
         PreparedStatement prepStmt = null;
         ResultSet results = null;
-        int tenantId = getTenantId();
         Connection connection = IdentityDatabaseUtil.getDBConnection(true);
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APPS);
-            prepStmt.setInt(1, tenantId);
+            prepStmt.setInt(1, this.tenantId);
             results = prepStmt.executeQuery();
             while (results.next()) {
                 if (serviceProvidersMap.containsKey(results.getString(2))) {
@@ -664,13 +654,12 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
             //TODO : error handling
             return false;
         }
-        int tenantId = getTenantId();
         Connection connection = IdentityDatabaseUtil.getDBConnection(false);
         PreparedStatement prepStmt = null;
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.REMOVE_SAML_APP_BY_ISSUER_NAME);
             prepStmt.setString(1, issuer);
-            prepStmt.setInt(2, tenantId);
+            prepStmt.setInt(2, this.tenantId);
             prepStmt.execute();
             IdentityDatabaseUtil.commitTransaction(connection);
         } catch (SQLException e) {
@@ -739,12 +728,11 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
         SAMLSSOServiceProviderDO serviceProviderDO = null;
         PreparedStatement prepStmt = null;
         ResultSet results = null;
-        int tenantId = getTenantId();
         Connection connection = IdentityDatabaseUtil.getDBConnection(true);
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APP_ALL_ATTRIBUTES_BY_ISSUER_NAME);
             prepStmt.setString(1, issuer);
-            prepStmt.setInt(2, tenantId);
+            prepStmt.setInt(2, this.tenantId);
             results = prepStmt.executeQuery();
             while (results.next()) {
                 updateServiceProviderDO(serviceProviderDO, results.getString(3), results.getString(4));
@@ -833,12 +821,11 @@ public class SAMLSSOServiceProviderDAO extends AbstractDAO<SAMLSSOServiceProvide
     public boolean isServiceProviderExists_new(String issuer) throws IdentityException {
         PreparedStatement prepStmt = null;
         ResultSet results = null;
-        int tenantId = getTenantId();
         Connection connection = IdentityDatabaseUtil.getDBConnection(true);
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APP_SINGLE_ATTRIBUTE_BY_ISSUER_NAME);
             prepStmt.setString(1, issuer);
-            prepStmt.setInt(2, tenantId);
+            prepStmt.setInt(2, this.tenantId);
             results = prepStmt.executeQuery();
             if (results.next()) {
                 return true;
