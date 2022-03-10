@@ -391,67 +391,6 @@ public class SAMLSSOServiceProviderDAO {
      * @return True if upload success.
      * @throws IdentityException Error occurred while adding the information to registry.
      */
-//    public SAMLSSOServiceProviderDO uploadServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws
-//            IdentityException {
-//
-//        if (serviceProviderDO == null || serviceProviderDO.getIssuer() == null) {
-//            throw new IdentityException("Issuer cannot be found in the provided arguments.");
-//        }
-//
-//        if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-//            serviceProviderDO.setIssuer(getIssuerWithQualifier(serviceProviderDO.getIssuer(),
-//                    serviceProviderDO.getIssuerQualifier()));
-//        }
-//
-//        if (serviceProviderDO.getDefaultAssertionConsumerUrl() == null) {
-//            throw new IdentityException("No default assertion consumer URL provided for service provider :" +
-//                    serviceProviderDO.getIssuer());
-//        }
-//
-//        String path = IdentityRegistryResources.SAML_SSO_SERVICE_PROVIDERS +
-//        encodePath(serviceProviderDO.getIssuer());
-//
-//        boolean isTransactionStarted = Transaction.isStarted();
-//        boolean isErrorOccurred = false;
-//        try {
-//            if (registry.resourceExists(path)) {
-//                if (log.isDebugEnabled()) {
-//                    if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-//                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-//                                + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier name "
-//                                + serviceProviderDO.getIssuerQualifier());
-//                    } else {
-//                        log.debug("SAML2 Service Provider already exists with the same issuer name "
-//                                + serviceProviderDO.getIssuer());
-//                    }
-//                }
-//                throw IdentityException.error("A Service Provider already exists.");
-//            }
-//
-//            if (!isTransactionStarted) {
-//                registry.beginTransaction();
-//            }
-//
-//            Resource resource = createResource(serviceProviderDO);
-//            registry.put(path, resource);
-//            if (log.isDebugEnabled()) {
-//                if (StringUtils.isNotBlank(serviceProviderDO.getIssuerQualifier())) {
-//                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " with issuer "
-//                            + getIssuerWithoutQualifier(serviceProviderDO.getIssuer()) + " and qualifier " +
-//                            serviceProviderDO.getIssuerQualifier() + " is added successfully.");
-//                } else {
-//                    log.debug("SAML2 Service Provider " + serviceProviderDO.getIssuer() + " is added successfully.");
-//                }
-//            }
-//            return serviceProviderDO;
-//        } catch (RegistryException e) {
-//            isErrorOccurred = true;
-//            throw IdentityException.error("Error while adding Service Provider.", e);
-//        } finally {
-//            commitOrRollbackTransaction(isErrorOccurred);
-//        }
-//    }
-
     public SAMLSSOServiceProviderDO uploadServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws
             IdentityException {
 
