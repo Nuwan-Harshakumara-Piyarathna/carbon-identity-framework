@@ -30,9 +30,11 @@ import org.wso2.carbon.identity.core.IdentityRegistryResources;
 import org.wso2.carbon.identity.core.KeyStoreCertificateRetriever;
 import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
+import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.registry.core.Registry;
 import org.wso2.carbon.registry.core.session.UserRegistry;
 import org.wso2.carbon.user.api.Tenant;
+import org.wso2.carbon.user.api.UserStoreException;
 
 import java.security.cert.X509Certificate;
 import java.sql.Connection;
@@ -100,6 +102,7 @@ public class SAMLSSOServiceProviderDAO {
 
     private final int tenantId;
 
+    @Deprecated
     public SAMLSSOServiceProviderDAO(Registry registry) {
         UserRegistry userRegistry = (UserRegistry) registry;
         this.tenantId = userRegistry.getTenantId();
@@ -110,11 +113,11 @@ public class SAMLSSOServiceProviderDAO {
     }
 
     /**
-     * Add the service provider information to the registry.
+     * Add the service provider information to the database.
      *
      * @param serviceProviderDO Service provider information object.
      * @return True if addition successful.
-     * @throws IdentityException Error while persisting to the registry.
+     * @throws IdentityException Error while persisting to the database.
      */
     public boolean addServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws IdentityException {
 
@@ -236,7 +239,7 @@ public class SAMLSSOServiceProviderDAO {
      *
      * @param issuer Name of the SAML issuer.
      * @return True if deletion success.
-     * @throws IdentityException Error occurred while removing the SAML service provider from registry.
+     * @throws IdentityException Error occurred while removing the SAML service provider from database.
      */
     public boolean removeServiceProvider(String issuer) throws IdentityException {
 
@@ -268,7 +271,13 @@ public class SAMLSSOServiceProviderDAO {
         return true;
     }
 
-
+    /**
+     * Get the service provider.
+     *
+     * @param issuer
+     * @return
+     * @throws IdentityException
+     */
     public SAMLSSOServiceProviderDO getServiceProvider(String issuer) throws IdentityException {
 
         if (!isServiceProviderExists(issuer)) {
@@ -281,7 +290,9 @@ public class SAMLSSOServiceProviderDAO {
         PreparedStatement prepStmt = null;
         ResultSet results = null;
         Connection connection = IdentityDatabaseUtil.getDBConnection(false);
+        String tenantDomain = null;
         try {
+            tenantDomain = IdentityTenantUtil.getRealmService().getTenantManager().getDomain(this.tenantId);
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.GET_SAML_APP_BY_ISSUER);
             prepStmt.setString(1, issuer);
             prepStmt.setInt(2, this.tenantId);
@@ -289,10 +300,26 @@ public class SAMLSSOServiceProviderDAO {
             while (results.next()) {
                 updateServiceProviderDO(serviceProviderDO, results.getString(1), results.getString(2));
             }
+            // Load the certificate stored in the database, if signature validation is enabled..
+            if (serviceProviderDO.isDoValidateSignatureInRequests() ||
+                    serviceProviderDO.isDoValidateSignatureInArtifactResolve() ||
+                    serviceProviderDO.isDoEnableEncryptedAssertion()) {
+                Tenant tenant = new Tenant();
+                tenant.setDomain(tenantDomain);
+                tenant.setId(this.tenantId);
+
+                serviceProviderDO.setX509Certificate(getApplicationCertificate(serviceProviderDO, tenant));
+            }
+        } catch (UserStoreException e) {
+            throw new IdentityException("Error occurred while getting tenant domain from tenant ID : " +
+                    this.tenantId, e);
         } catch (SQLException e) {
             String msg = "Error getting service provider from the database with issuer : " + issuer;
             log.error(msg, e);
             throw new IdentityException(msg, e);
+        } catch (CertificateRetrievingException e) {
+            throw new IdentityException(String.format("An error occurred while getting the " +
+                    "application certificate for validating the requests from the issuer '%s'", issuer), e);
         } finally {
             IdentityDatabaseUtil.closeAllConnections(connection, results, prepStmt);
         }
@@ -389,7 +416,7 @@ public class SAMLSSOServiceProviderDAO {
      *
      * @param serviceProviderDO Service provider information object.
      * @return True if upload success.
-     * @throws IdentityException Error occurred while adding the information to registry.
+     * @throws IdentityException Error occurred while adding the information to database.
      */
     public SAMLSSOServiceProviderDO uploadServiceProvider(SAMLSSOServiceProviderDO serviceProviderDO) throws
             IdentityException {
