@@ -21,6 +21,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.opensaml.saml.saml1.core.NameIdentifier;
+import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.database.utils.jdbc.exceptions.DataAccessException;
 import org.wso2.carbon.identity.base.IdentityException;
 import org.wso2.carbon.identity.core.CertificateRetriever;
@@ -104,8 +105,15 @@ public class SAMLSSOServiceProviderDAO {
 
     @Deprecated
     public SAMLSSOServiceProviderDAO(Registry registry) {
-        UserRegistry userRegistry = (UserRegistry) registry;
-        this.tenantId = userRegistry.getTenantId();
+        if (registry instanceof UserRegistry) {
+            UserRegistry userRegistry = (UserRegistry) registry;
+            this.tenantId = userRegistry.getTenantId();
+        }
+        else {
+            String tenantDomain = CarbonContext.getThreadLocalCarbonContext().getTenantDomain();
+            this.tenantId = IdentityTenantUtil.getTenantId(tenantDomain);
+        }
+        int tenantId = CarbonContext.getThreadLocalCarbonContext().getTenantId();
     }
 
     public SAMLSSOServiceProviderDAO(int tenantId) {
