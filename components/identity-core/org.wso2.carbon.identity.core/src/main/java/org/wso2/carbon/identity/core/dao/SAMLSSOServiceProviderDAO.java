@@ -401,6 +401,7 @@ public class SAMLSSOServiceProviderDAO {
         PreparedStatement prepStmt = null;
         ResultSet results = null;
         Connection connection = IdentityDatabaseUtil.getDBConnection(false);
+
         try {
             prepStmt = connection.prepareStatement(SAMLSSOSQLQueries.CHECK_SAML_APP_EXISTS_BY_ISSUER);
             prepStmt.setString(1, issuer);
